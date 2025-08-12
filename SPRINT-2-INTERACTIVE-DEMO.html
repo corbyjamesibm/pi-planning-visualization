@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint 2 - Interactive Feature Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f4f4f4;
+            color: #161616;
+        }
+        
+        /* Carbon Design System Variables */
+        :root {
+            --cds-ui-background: #ffffff;
+            --cds-ui-01: #f4f4f4;
+            --cds-ui-02: #ffffff;
+            --cds-ui-03: #e0e0e0;
+            --cds-ui-04: #8d8d8d;
+            --cds-ui-05: #161616;
+            --cds-text-01: #161616;
+            --cds-text-02: #525252;
+            --cds-text-03: #a8a8a8;
+            --cds-interactive-01: #0f62fe;
+            --cds-interactive-02: #393939;
+            --cds-interactive-03: #0f62fe;
+            --cds-interactive-04: #0f62fe;
+            --cds-danger: #da1e28;
+            --cds-success: #24a148;
+            --cds-warning: #f1c21b;
+        }
+        
+        .header {
+            background: var(--cds-ui-05);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 400;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            height: calc(100vh - 60px);
+            gap: 1px;
+            background: var(--cds-ui-03);
+        }
+        
+        .sidebar {
+            background: var(--cds-ui-02);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .main {
+            background: var(--cds-ui-02);
+            padding: 2rem;
+            overflow: auto;
+            position: relative;
+        }
+        
+        /* Search Feature Demo */
+        .search-container {
+            margin-bottom: 2rem;
+        }
+        
+        .search-box {
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 2.5rem 0.75rem 1rem;
+            border: 1px solid var(--cds-ui-03);
+            border-radius: 0;
+            font-size: 0.875rem;
+            transition: all 0.15s ease;
+        }
+        
+        .search-input:focus {
+            outline: 2px solid var(--cds-interactive-01);
+            outline-offset: -2px;
+            border-color: var(--cds-interactive-01);
+        }
+        
+        .search-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--cds-text-03);
+        }
+        
+        .search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--cds-ui-03);
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 100;
+        }
+        
+        .search-suggestions.active {
+            display: block;
+        }
+        
+        .suggestion-item {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        
+        .suggestion-item:hover {
+            background: var(--cds-ui-01);
+        }
+        
+        .suggestion-item.selected {
+            background: var(--cds-interactive-01);
+            color: white;
+        }
+        
+        /* Filter Section */
+        .filters {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--cds-ui-01);
+            border-radius: 4px;
+        }
+        
+        .filter-group {
+            margin-bottom: 1rem;
+        }
+        
+        .filter-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--cds-text-02);
+            margin-bottom: 0.5rem;
+        }
+        
+        .filter-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .chip {
+            padding: 0.25rem 0.75rem;
+            background: white;
+            border: 1px solid var(--cds-ui-03);
+            border-radius: 16px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .chip:hover {
+            background: var(--cds-ui-01);
+        }
+        
+        .chip.active {
+            background: var(--cds-interactive-01);
+            color: white;
+            border-color: var(--cds-interactive-01);
+        }
+        
+        /* Drag & Drop Demo */
+        .planning-board {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            min-height: 400px;
+        }
+        
+        .team-column {
+            background: var(--cds-ui-01);
+            border: 2px dashed var(--cds-ui-03);
+            border-radius: 4px;
+            padding: 1rem;
+            min-height: 300px;
+            transition: all 0.3s ease;
+        }
+        
+        .team-column.drag-over {
+            background: #e8f4fd;
+            border-color: var(--cds-interactive-01);
+            box-shadow: 0 0 0 2px rgba(15, 98, 254, 0.2);
+        }
+        
+        .team-column.full {
+            background: #fff1f1;
+            border-color: var(--cds-danger);
+        }
+        
+        .team-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--cds-ui-03);
+        }
+        
+        .team-name {
+            font-weight: 600;
+            color: var(--cds-text-01);
+        }
+        
+        .team-capacity {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 10px;
+            background: var(--cds-ui-03);
+        }
+        
+        .team-capacity.warning {
+            background: var(--cds-warning);
+            color: black;
+        }
+        
+        .team-capacity.danger {
+            background: var(--cds-danger);
+            color: white;
+        }
+        
+        .feature-card {
+            background: white;
+            border: 1px solid var(--cds-ui-03);
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            cursor: move;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .feature-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .feature-card.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+        }
+        
+        .feature-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .feature-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--cds-text-02);
+        }
+        
+        .feature-points {
+            background: var(--cds-interactive-01);
+            color: white;
+            padding: 0.125rem 0.375rem;
+            border-radius: 10px;
+        }
+        
+        /* Ghost Element */
+        .ghost-element {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0.8;
+            transform: rotate(-2deg);
+            transition: none;
+        }
+        
+        /* Status Bar */
+        .status-bar {
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--cds-ui-05);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .status-bar.show {
+            opacity: 1;
+        }
+        
+        /* Undo/Redo Buttons */
+        .action-buttons {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            display: flex;
+            gap: 0.5rem;
+            z-index: 100;
+        }
+        
+        .action-btn {
+            padding: 0.5rem 1rem;
+            background: white;
+            border: 1px solid var(--cds-ui-03);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.15s ease;
+        }
+        
+        .action-btn:hover:not(:disabled) {
+            background: var(--cds-ui-01);
+        }
+        
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Results Display */
+        .search-results {
+            margin-top: 1rem;
+        }
+        
+        .result-item {
+            padding: 0.75rem;
+            background: white;
+            border: 1px solid var(--cds-ui-03);
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        
+        .result-item:hover {
+            background: var(--cds-ui-01);
+            transform: translateX(4px);
+        }
+        
+        .result-item.highlighted {
+            border-color: var(--cds-interactive-01);
+            background: #e8f4fd;
+        }
+        
+        .highlight {
+            background: yellow;
+            font-weight: 600;
+        }
+        
+        /* Performance Indicator */
+        .performance-indicator {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            background: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: 1px solid var(--cds-ui-03);
+            font-size: 0.75rem;
+            z-index: 100;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.25rem 0;
+        }
+        
+        .metric-value {
+            font-weight: 600;
+            color: var(--cds-success);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Sprint 2 Interactive Demo - PI Planning Visualization</h1>
+        <div>
+            <span style="margin-right: 2rem;">E3-US1: Drag & Drop ✅</span>
+            <span>E2-US3: Enhanced Search ✅</span>
+        </div>
+    </div>
+    
+    <div class="performance-indicator">
+        <div class="metric">
+            <span>FPS:</span>
+            <span class="metric-value" id="fps">60</span>
+        </div>
+        <div class="metric">
+            <span>Search:</span>
+            <span class="metric-value" id="searchTime">0ms</span>
+        </div>
+        <div class="metric">
+            <span>Drag Count:</span>
+            <span class="metric-value" id="dragCount">0</span>
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <button class="action-btn" id="undoBtn" disabled>↶ Undo (Ctrl+Z)</button>
+        <button class="action-btn" id="redoBtn" disabled>↷ Redo (Ctrl+Y)</button>
+        <button class="action-btn" id="resetBtn">Reset Demo</button>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <h2 style="margin-bottom: 1rem;">Enhanced Search</h2>
+            
+            <div class="search-container">
+                <div class="search-box">
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        id="searchInput"
+                        placeholder="Search features, stories, teams..."
+                        autocomplete="off"
+                    >
+                    <span class="search-icon">🔍</span>
+                    <div class="search-suggestions" id="suggestions">
+                        <div class="suggestion-item">Payment Processing</div>
+                        <div class="suggestion-item">User Authentication</div>
+                        <div class="suggestion-item">Digital Delivery Team</div>
+                        <div class="suggestion-item">High Priority Items</div>
+                        <div class="suggestion-item">Sprint 1 Features</div>
+                    </div>
+                </div>
+                
+                <div class="filters">
+                    <div class="filter-group">
+                        <div class="filter-label">Teams</div>
+                        <div class="filter-chips">
+                            <div class="chip" data-filter="team" data-value="digital">Digital Delivery</div>
+                            <div class="chip" data-filter="team" data-value="platform">Platform Services</div>
+                            <div class="chip" data-filter="team" data-value="data">Data Analytics</div>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <div class="filter-label">Priority</div>
+                        <div class="filter-chips">
+                            <div class="chip" data-filter="priority" data-value="high">High</div>
+                            <div class="chip" data-filter="priority" data-value="medium">Medium</div>
+                            <div class="chip" data-filter="priority" data-value="low">Low</div>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <div class="filter-label">Status</div>
+                        <div class="filter-chips">
+                            <div class="chip" data-filter="status" data-value="planned">Planned</div>
+                            <div class="chip" data-filter="status" data-value="progress">In Progress</div>
+                            <div class="chip" data-filter="status" data-value="blocked">Blocked</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="search-results" id="searchResults"></div>
+            </div>
+        </div>
+        
+        <div class="main">
+            <h2 style="margin-bottom: 1rem;">Drag & Drop Planning Board</h2>
+            <p style="color: var(--cds-text-02); margin-bottom: 2rem;">
+                Drag features between teams to replan. Teams will show warnings when near capacity.
+            </p>
+            
+            <div class="planning-board" id="planningBoard">
+                <div class="team-column" data-team="digital" data-capacity="15" data-used="8">
+                    <div class="team-header">
+                        <span class="team-name">Digital Delivery</span>
+                        <span class="team-capacity">8/15 pts</span>
+                    </div>
+                    <div class="feature-card" draggable="true" data-id="f1" data-points="3">
+                        <div class="feature-title">User Authentication</div>
+                        <div class="feature-meta">
+                            <span>E1-F1</span>
+                            <span class="feature-points">3 pts</span>
+                        </div>
+                    </div>
+                    <div class="feature-card" draggable="true" data-id="f2" data-points="5">
+                        <div class="feature-title">Payment Processing</div>
+                        <div class="feature-meta">
+                            <span>E1-F2</span>
+                            <span class="feature-points">5 pts</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="team-column" data-team="platform" data-capacity="20" data-used="13">
+                    <div class="team-header">
+                        <span class="team-name">Platform Services</span>
+                        <span class="team-capacity warning">13/20 pts</span>
+                    </div>
+                    <div class="feature-card" draggable="true" data-id="f3" data-points="8">
+                        <div class="feature-title">API Gateway</div>
+                        <div class="feature-meta">
+                            <span>E2-F1</span>
+                            <span class="feature-points">8 pts</span>
+                        </div>
+                    </div>
+                    <div class="feature-card" draggable="true" data-id="f4" data-points="5">
+                        <div class="feature-title">Service Mesh</div>
+                        <div class="feature-meta">
+                            <span>E2-F2</span>
+                            <span class="feature-points">5 pts</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="team-column" data-team="data" data-capacity="12" data-used="5">
+                    <div class="team-header">
+                        <span class="team-name">Data Analytics</span>
+                        <span class="team-capacity">5/12 pts</span>
+                    </div>
+                    <div class="feature-card" draggable="true" data-id="f5" data-points="5">
+                        <div class="feature-title">Analytics Dashboard</div>
+                        <div class="feature-meta">
+                            <span>E3-F1</span>
+                            <span class="feature-points">5 pts</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sidebar">
+            <h2 style="margin-bottom: 1rem;">Feature Details</h2>
+            <div id="featureDetails" style="padding: 1rem; background: var(--cds-ui-01); border-radius: 4px;">
+                <p style="color: var(--cds-text-02);">
+                    Hover over features or use search to see details here.
+                </p>
+            </div>
+            
+            <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Recent Actions</h3>
+            <div id="actionLog" style="font-size: 0.75rem; color: var(--cds-text-02);">
+                <div>Demo started</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-bar" id="statusBar">
+        <span id="statusMessage">Ready</span>
+    </div>
+    
+    <script>
+        // Feature data for search
+        const features = [
+            { id: 'f1', title: 'User Authentication', team: 'Digital Delivery', priority: 'high', status: 'planned', points: 3, epic: 'E1' },
+            { id: 'f2', title: 'Payment Processing', team: 'Digital Delivery', priority: 'high', status: 'progress', points: 5, epic: 'E1' },
+            { id: 'f3', title: 'API Gateway', team: 'Platform Services', priority: 'medium', status: 'planned', points: 8, epic: 'E2' },
+            { id: 'f4', title: 'Service Mesh', team: 'Platform Services', priority: 'medium', status: 'planned', points: 5, epic: 'E2' },
+            { id: 'f5', title: 'Analytics Dashboard', team: 'Data Analytics', priority: 'low', status: 'planned', points: 5, epic: 'E3' },
+            { id: 'f6', title: 'User Profile Management', team: 'Unassigned', priority: 'medium', status: 'planned', points: 3, epic: 'E1' },
+            { id: 'f7', title: 'Notification Service', team: 'Unassigned', priority: 'low', status: 'blocked', points: 2, epic: 'E2' },
+            { id: 'f8', title: 'Data Pipeline', team: 'Unassigned', priority: 'high', status: 'planned', points: 8, epic: 'E3' }
+        ];
+        
+        // Undo/Redo history
+        let history = [];
+        let historyIndex = -1;
+        let dragCounter = 0;
+        
+        // Performance tracking
+        let lastFrameTime = performance.now();
+        let fps = 60;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeDragDrop();
+            initializeSearch();
+            initializeKeyboardShortcuts();
+            trackPerformance();
+        });
+        
+        // Drag & Drop Implementation
+        function initializeDragDrop() {
+            let draggedElement = null;
+            let ghostElement = null;
+            let originalParent = null;
+            let originalNextSibling = null;
+            
+            document.querySelectorAll('.feature-card').forEach(card => {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+            });
+            
+            document.querySelectorAll('.team-column').forEach(column => {
+                column.addEventListener('dragover', handleDragOver);
+                column.addEventListener('drop', handleDrop);
+                column.addEventListener('dragleave', handleDragLeave);
+                column.addEventListener('dragenter', handleDragEnter);
+            });
+            
+            function handleDragStart(e) {
+                draggedElement = e.target;
+                originalParent = draggedElement.parentNode;
+                originalNextSibling = draggedElement.nextSibling;
+                
+                draggedElement.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                
+                // Create ghost element
+                ghostElement = draggedElement.cloneNode(true);
+                ghostElement.classList.add('ghost-element');
+                document.body.appendChild(ghostElement);
+                
+                updateStatus('Dragging ' + draggedElement.querySelector('.feature-title').textContent);
+                
+                // Track drag count
+                dragCounter++;
+                document.getElementById('dragCount').textContent = dragCounter;
+            }
+            
+            function handleDragEnd(e) {
+                if (draggedElement) {
+                    draggedElement.classList.remove('dragging');
+                }
+                
+                if (ghostElement) {
+                    ghostElement.remove();
+                    ghostElement = null;
+                }
+                
+                document.querySelectorAll('.team-column').forEach(col => {
+                    col.classList.remove('drag-over', 'full');
+                });
+                
+                updateStatus('Ready');
+            }
+            
+            function handleDragOver(e) {
+                if (e.preventDefault) {
+                    e.preventDefault();
+                }
+                
+                // Update ghost element position
+                if (ghostElement) {
+                    ghostElement.style.left = e.clientX + 10 + 'px';
+                    ghostElement.style.top = e.clientY + 10 + 'px';
+                }
+                
+                return false;
+            }
+            
+            function handleDragEnter(e) {
+                const column = e.currentTarget;
+                if (!column.classList.contains('team-column')) return;
+                
+                const capacity = parseInt(column.dataset.capacity);
+                const used = parseInt(column.dataset.used);
+                const draggedPoints = parseInt(draggedElement.dataset.points);
+                
+                if (used + draggedPoints > capacity) {
+                    column.classList.add('full');
+                    updateStatus('❌ Team at full capacity!');
+                } else if (used + draggedPoints > capacity * 0.8) {
+                    column.classList.add('drag-over');
+                    updateStatus('⚠️ Team near capacity');
+                } else {
+                    column.classList.add('drag-over');
+                    updateStatus('✅ Valid drop zone');
+                }
+            }
+            
+            function handleDragLeave(e) {
+                if (e.currentTarget.classList.contains('team-column')) {
+                    e.currentTarget.classList.remove('drag-over', 'full');
+                }
+            }
+            
+            function handleDrop(e) {
+                if (e.stopPropagation) {
+                    e.stopPropagation();
+                }
+                
+                const column = e.currentTarget;
+                if (!column.classList.contains('team-column')) return;
+                
+                const capacity = parseInt(column.dataset.capacity);
+                const used = parseInt(column.dataset.used);
+                const draggedPoints = parseInt(draggedElement.dataset.points);
+                
+                if (used + draggedPoints > capacity) {
+                    updateStatus('❌ Cannot drop - team at capacity!', 'error');
+                    return false;
+                }
+                
+                // Save state for undo
+                saveState();
+                
+                // Update capacity
+                const oldParent = draggedElement.parentNode.closest('.team-column');
+                if (oldParent) {
+                    const oldUsed = parseInt(oldParent.dataset.used);
+                    oldParent.dataset.used = oldUsed - draggedPoints;
+                    updateTeamCapacity(oldParent);
+                }
+                
+                column.dataset.used = used + draggedPoints;
+                updateTeamCapacity(column);
+                
+                // Move the element
+                column.appendChild(draggedElement);
+                
+                // Log action
+                logAction(`Moved ${draggedElement.querySelector('.feature-title').textContent} to ${column.querySelector('.team-name').textContent}`);
+                
+                updateStatus('✅ Feature moved successfully', 'success');
+                
+                // Update search if active
+                performSearch();
+                
+                return false;
+            }
+        }
+        
+        function updateTeamCapacity(column) {
+            const capacity = parseInt(column.dataset.capacity);
+            const used = parseInt(column.dataset.used);
+            const capacityElement = column.querySelector('.team-capacity');
+            
+            capacityElement.textContent = `${used}/${capacity} pts`;
+            
+            capacityElement.classList.remove('warning', 'danger');
+            if (used >= capacity) {
+                capacityElement.classList.add('danger');
+            } else if (used > capacity * 0.8) {
+                capacityElement.classList.add('warning');
+            }
+        }
+        
+        // Search Implementation
+        function initializeSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const suggestions = document.getElementById('suggestions');
+            let searchTimeout;
+            
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    performSearch();
+                }, 300); // Debounce
+            });
+            
+            searchInput.addEventListener('focus', () => {
+                suggestions.classList.add('active');
+            });
+            
+            searchInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    suggestions.classList.remove('active');
+                }, 200);
+            });
+            
+            // Suggestion clicks
+            document.querySelectorAll('.suggestion-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    searchInput.value = item.textContent;
+                    performSearch();
+                });
+            });
+            
+            // Filter chips
+            document.querySelectorAll('.chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    chip.classList.toggle('active');
+                    performSearch();
+                });
+            });
+        }
+        
+        function performSearch() {
+            const startTime = performance.now();
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const activeFilters = getActiveFilters();
+            
+            let results = features.filter(feature => {
+                // Text search
+                if (searchTerm && !feature.title.toLowerCase().includes(searchTerm) &&
+                    !feature.team.toLowerCase().includes(searchTerm)) {
+                    return false;
+                }
+                
+                // Filter by team
+                if (activeFilters.team.length > 0) {
+                    const teamMatch = activeFilters.team.some(team => 
+                        feature.team.toLowerCase().includes(team)
+                    );
+                    if (!teamMatch) return false;
+                }
+                
+                // Filter by priority
+                if (activeFilters.priority.length > 0 && 
+                    !activeFilters.priority.includes(feature.priority)) {
+                    return false;
+                }
+                
+                // Filter by status
+                if (activeFilters.status.length > 0 && 
+                    !activeFilters.status.includes(feature.status)) {
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            displaySearchResults(results, searchTerm);
+            
+            // Update performance metric
+            const searchTime = performance.now() - startTime;
+            document.getElementById('searchTime').textContent = searchTime.toFixed(1) + 'ms';
+            
+            // Highlight matching features on board
+            highlightFeatures(results.map(r => r.id));
+        }
+        
+        function getActiveFilters() {
+            const filters = {
+                team: [],
+                priority: [],
+                status: []
+            };
+            
+            document.querySelectorAll('.chip.active').forEach(chip => {
+                const filterType = chip.dataset.filter;
+                const filterValue = chip.dataset.value;
+                filters[filterType].push(filterValue);
+            });
+            
+            return filters;
+        }
+        
+        function displaySearchResults(results, searchTerm) {
+            const container = document.getElementById('searchResults');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div style="padding: 1rem; color: var(--cds-text-02);">No results found</div>';
+                return;
+            }
+            
+            container.innerHTML = results.map(result => {
+                const highlightedTitle = searchTerm ? 
+                    result.title.replace(new RegExp(searchTerm, 'gi'), match => 
+                        `<span class="highlight">${match}</span>`) : 
+                    result.title;
+                
+                return `
+                    <div class="result-item" data-id="${result.id}">
+                        <div style="font-weight: 600;">${highlightedTitle}</div>
+                        <div style="font-size: 0.75rem; color: var(--cds-text-02);">
+                            ${result.team} • ${result.priority} priority • ${result.status}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Add click handlers
+            container.querySelectorAll('.result-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const featureId = item.dataset.id;
+                    const featureCard = document.querySelector(`[data-id="${featureId}"]`);
+                    if (featureCard) {
+                        featureCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        featureCard.style.animation = 'pulse 1s';
+                        setTimeout(() => {
+                            featureCard.style.animation = '';
+                        }, 1000);
+                    }
+                });
+            });
+        }
+        
+        function highlightFeatures(featureIds) {
+            document.querySelectorAll('.feature-card').forEach(card => {
+                if (featureIds.includes(card.dataset.id)) {
+                    card.classList.add('highlighted');
+                } else {
+                    card.classList.remove('highlighted');
+                }
+            });
+        }
+        
+        // Undo/Redo functionality
+        function saveState() {
+            const state = document.getElementById('planningBoard').innerHTML;
+            
+            // Remove states after current index
+            history = history.slice(0, historyIndex + 1);
+            
+            // Add new state
+            history.push(state);
+            historyIndex++;
+            
+            // Update buttons
+            updateUndoRedoButtons();
+        }
+        
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                document.getElementById('planningBoard').innerHTML = history[historyIndex];
+                reinitializeDragDrop();
+                updateUndoRedoButtons();
+                logAction('Undo performed');
+                updateStatus('↶ Undone');
+            }
+        }
+        
+        function redo() {
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                document.getElementById('planningBoard').innerHTML = history[historyIndex];
+                reinitializeDragDrop();
+                updateUndoRedoButtons();
+                logAction('Redo performed');
+                updateStatus('↷ Redone');
+            }
+        }
+        
+        function updateUndoRedoButtons() {
+            document.getElementById('undoBtn').disabled = historyIndex <= 0;
+            document.getElementById('redoBtn').disabled = historyIndex >= history.length - 1;
+        }
+        
+        function reinitializeDragDrop() {
+            initializeDragDrop();
+        }
+        
+        // Keyboard shortcuts
+        function initializeKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    if (e.key === 'z' && !e.shiftKey) {
+                        e.preventDefault();
+                        undo();
+                    } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+                        e.preventDefault();
+                        redo();
+                    } else if (e.key === 'k') {
+                        e.preventDefault();
+                        document.getElementById('searchInput').focus();
+                    }
+                }
+                
+                if (e.key === 'Escape') {
+                    document.getElementById('searchInput').value = '';
+                    performSearch();
+                }
+            });
+            
+            // Button handlers
+            document.getElementById('undoBtn').addEventListener('click', undo);
+            document.getElementById('redoBtn').addEventListener('click', redo);
+            document.getElementById('resetBtn').addEventListener('click', resetDemo);
+        }
+        
+        // Utility functions
+        function updateStatus(message, type = 'info') {
+            const statusBar = document.getElementById('statusBar');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            statusMessage.textContent = message;
+            statusBar.classList.add('show');
+            
+            if (type === 'error') {
+                statusBar.style.background = 'var(--cds-danger)';
+            } else if (type === 'success') {
+                statusBar.style.background = 'var(--cds-success)';
+            } else {
+                statusBar.style.background = 'var(--cds-ui-05)';
+            }
+            
+            setTimeout(() => {
+                statusBar.classList.remove('show');
+            }, 3000);
+        }
+        
+        function logAction(action) {
+            const log = document.getElementById('actionLog');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.textContent = `${time}: ${action}`;
+            log.insertBefore(entry, log.firstChild);
+            
+            // Keep only last 10 actions
+            while (log.children.length > 10) {
+                log.removeChild(log.lastChild);
+            }
+        }
+        
+        function resetDemo() {
+            location.reload();
+        }
+        
+        // Performance tracking
+        function trackPerformance() {
+            function updateFPS() {
+                const now = performance.now();
+                const delta = now - lastFrameTime;
+                fps = Math.round(1000 / delta);
+                lastFrameTime = now;
+                
+                document.getElementById('fps').textContent = fps;
+                document.getElementById('fps').style.color = 
+                    fps >= 50 ? 'var(--cds-success)' : 
+                    fps >= 30 ? 'var(--cds-warning)' : 
+                    'var(--cds-danger)';
+                
+                requestAnimationFrame(updateFPS);
+            }
+            
+            requestAnimationFrame(updateFPS);
+        }
+        
+        // Initial state
+        saveState();
+        
+        // Add pulse animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning - Timeline View</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .timeline-indicator {
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .date-display {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .sprint-info {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        #visualization {
+            width: 100%;
+            height: calc(100vh - 280px);
+            background: white;
+            position: relative;
+        }
+        
+        .controls-panel {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 20px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            z-index: 1000;
+        }
+        
+        .timeline-container {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .timeline-slider {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(to right, #667eea 0%, #667eea var(--progress, 0%), #ddd var(--progress, 0%), #ddd 100%);
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #667eea;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            transition: all 0.2s;
+        }
+        
+        .timeline-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 3px 12px rgba(102, 126, 234, 0.6);
+        }
+        
+        .timeline-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: #667eea;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            transition: all 0.2s;
+        }
+        
+        .timeline-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            position: relative;
+        }
+        
+        .sprint-marker {
+            position: relative;
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .sprint-marker::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 15px;
+            background: #ccc;
+        }
+        
+        .playback-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 15px 0;
+        }
+        
+        .control-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .control-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .control-btn.primary {
+            background: #667eea;
+            color: white;
+            min-width: 100px;
+        }
+        
+        .control-btn.primary:hover {
+            background: #5a72d8;
+        }
+        
+        .speed-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-left: auto;
+            padding-left: 20px;
+            border-left: 1px solid #e0e0e0;
+        }
+        
+        .speed-btn {
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .speed-btn:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+        
+        .speed-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .metrics-bar {
+            display: flex;
+            gap: 30px;
+            padding: 10px 0;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .metric {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .change-indicators {
+            display: flex;
+            gap: 15px;
+            position: absolute;
+            top: 15px;
+            right: 30px;
+        }
+        
+        .change-indicator {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            animation: fadeInScale 0.3s ease-out;
+        }
+        
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .change-indicator.added {
+            background: #d4f4dd;
+            color: #2e7d46;
+        }
+        
+        .change-indicator.moved {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .change-indicator.completed {
+            background: #cce5ff;
+            color: #004085;
+        }
+        
+        /* Visualization styles */
+        .node {
+            cursor: pointer;
+        }
+        
+        .node circle {
+            transition: all 0.3s;
+        }
+        
+        .node:hover circle {
+            transform: scale(1.1);
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            transition: all 0.3s;
+        }
+        
+        .link.dependency {
+            stroke: #ff6b6b;
+            stroke-dasharray: 5,5;
+        }
+        
+        .link.highlighted {
+            stroke-width: 3;
+            stroke-opacity: 1;
+        }
+        
+        /* Animation for nodes */
+        @keyframes nodeAppear {
+            from {
+                opacity: 0;
+                transform: scale(0);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .node.new {
+            animation: nodeAppear 0.5s ease-out;
+        }
+        
+        @keyframes nodeComplete {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.3);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+        
+        .node.completed {
+            animation: nodeComplete 0.6s ease-out;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 220px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        
+        .legend-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #666;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+            font-size: 13px;
+            color: #333;
+        }
+        
+        .legend-color {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .legend-color.team {
+            background: #27ae60;
+        }
+        
+        .legend-color.feature {
+            background: #667eea;
+        }
+        
+        .legend-color.story {
+            background: #3498db;
+        }
+        
+        .legend-color.dependency {
+            width: 30px;
+            height: 2px;
+            border-radius: 0;
+            background: #ff6b6b;
+            border: none;
+            border-top: 2px dashed #ff6b6b;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 PI Planning Timeline View</h1>
+        <div class="timeline-indicator">Timeline Mode Active</div>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="font-size: 14px; color: #666;">Spacing:</label>
+                <input type="range" id="spacingSlider" min="50" max="400" value="200" 
+                       style="width: 150px; cursor: pointer;">
+                <span id="spacingValue" style="font-size: 14px; color: #667eea; font-weight: 600; min-width: 40px;">200</span>
+            </div>
+            <div class="change-indicators" id="changeIndicators"></div>
+        </div>
+    </div>
+    
+    <div id="visualization"></div>
+    
+    <div class="legend">
+        <div class="legend-title">Legend</div>
+        <div class="legend-item">
+            <div class="legend-color team"></div>
+            <span>Teams</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color feature"></div>
+            <span>Features</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color story"></div>
+            <span>User Stories</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color dependency"></div>
+            <span>Dependencies</span>
+        </div>
+    </div>
+    
+    <div class="controls-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div>
+                <div class="date-display" id="currentDate">March 1, 2025</div>
+                <div class="sprint-info" id="sprintInfo">Sprint 1 - Day 1</div>
+            </div>
+            <div class="metrics-bar">
+                <div class="metric">
+                    <span class="metric-label">Points Completed:</span>
+                    <span class="metric-value" id="completedPoints">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Total Points:</span>
+                    <span class="metric-value" id="totalPoints">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Velocity:</span>
+                    <span class="metric-value" id="velocity">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Dependencies:</span>
+                    <span class="metric-value" id="dependencies">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="timeline-container">
+            <input type="range" class="timeline-slider" id="timelineSlider" min="0" max="89" value="0">
+            <div class="timeline-labels" id="timelineLabels"></div>
+        </div>
+        
+        <div class="playback-controls">
+            <button class="control-btn" id="btn-start" title="Jump to Start">⏮️ Start</button>
+            <button class="control-btn" id="btn-prev" title="Previous Day">⏪ Prev</button>
+            <button class="control-btn primary" id="btn-play" title="Play/Pause">▶️ Play</button>
+            <button class="control-btn" id="btn-next" title="Next Day">⏩ Next</button>
+            <button class="control-btn" id="btn-end" title="Jump to End">⏭️ End</button>
+            
+            <div class="speed-controls">
+                <label style="margin-right: 10px;">Speed:</label>
+                <button class="speed-btn" data-speed="0.5">0.5x</button>
+                <button class="speed-btn active" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="2">2x</button>
+                <button class="speed-btn" data-speed="5">5x</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Spacing control
+        let currentSpacing = 200;
+        const spacingSlider = document.getElementById('spacingSlider');
+        const spacingValue = document.getElementById('spacingValue');
+        
+        spacingSlider.addEventListener('input', (e) => {
+            currentSpacing = parseInt(e.target.value);
+            spacingValue.textContent = currentSpacing;
+            updateVisualizationWithSpacing(timelapseData[currentIndex]);
+        });
+        
+        // Generate timeline data
+        function generateTimelapseData() {
+            const snapshots = [];
+            const startDate = new Date('2025-01-01');
+            const teams = [
+                { id: 'team-1', name: 'Platform Services', x: 200, y: 200, artId: 1, artName: 'Platform ART' },
+                { id: 'team-2', name: 'Digital Delivery', x: 600, y: 200, artId: 1, artName: 'Platform ART' },
+                { id: 'team-3', name: 'Data Analytics', x: 1000, y: 200, artId: 2, artName: 'Data ART' },
+                { id: 'team-4', name: 'Customer Experience', x: 400, y: 500, artId: 2, artName: 'Data ART' },
+                { id: 'team-5', name: 'Infrastructure', x: 800, y: 500, artId: 3, artName: 'Infra ART' },
+                { id: 'team-6', name: 'Security', x: 200, y: 500, artId: 3, artName: 'Infra ART' },
+                { id: 'team-7', name: 'Mobile Apps', x: 1000, y: 500, artId: 1, artName: 'Platform ART' }
+            ];
+            
+            // Initialize with teams as nodes
+            let currentNodes = teams.map(t => ({ 
+                ...t, 
+                type: 'team', 
+                capacity: 100, 
+                allocated: 0,
+                status: 'active' 
+            }));
+            let currentLinks = [];
+            let completedPoints = 0;
+            let featureId = 1;
+            
+            console.log('Initial nodes (teams):', currentNodes);
+            
+            for (let day = 0; day < 90; day++) {
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + day);
+                const sprint = Math.floor(day / 14) + 1;
+                const sprintDay = (day % 14) + 1;
+                
+                const changes = { added: [], moved: [], completed: [], removed: [] };
+                
+                // Initial planning - add some features on day 0
+                if (day === 0) {
+                    // Make sure we have at least some initial features
+                    for (let i = 0; i < 8; i++) {
+                        const teamIndex = i % teams.length;
+                        const feature = {
+                            id: `feat-${featureId++}`,
+                            name: `Feature ${featureId}`,
+                            type: 'feature',
+                            team: teams[teamIndex].id,
+                            points: 5 + Math.floor(Math.random() * 15),
+                            status: 'planned',
+                            x: teams[teamIndex].x + (Math.random() - 0.5) * 80,
+                            y: teams[teamIndex].y + (Math.random() - 0.5) * 80
+                        };
+                        currentNodes.push(feature);
+                        changes.added.push(feature.id);
+                        
+                        // Update team allocation
+                        const team = currentNodes.find(n => n.id === teams[teamIndex].id);
+                        if (team) {
+                            team.allocated = Math.min(team.allocated + feature.points, team.capacity);
+                        }
+                    }
+                }
+                
+                // Sprint changes
+                if (sprintDay === 1 && day > 0) {
+                    // Add new features at sprint start
+                    for (let i = 0; i < Math.floor(Math.random() * 5) + 2; i++) {
+                        const teamIndex = Math.floor(Math.random() * teams.length);
+                        const feature = {
+                            id: `feat-${featureId++}`,
+                            name: `Feature ${featureId}`,
+                            type: 'feature',
+                            team: teams[teamIndex].id,
+                            points: 5 + Math.floor(Math.random() * 10),
+                            status: 'planned',
+                            x: teams[teamIndex].x + (Math.random() - 0.5) * 80,
+                            y: teams[teamIndex].y + (Math.random() - 0.5) * 80
+                        };
+                        currentNodes.push(feature);
+                        changes.added.push(feature.id);
+                    }
+                }
+                
+                // Progress features
+                if (day > 0 && day % 3 === 0) {
+                    const features = currentNodes.filter(n => n.type === 'feature');
+                    const planned = features.filter(f => f.status === 'planned');
+                    const inProgress = features.filter(f => f.status === 'in-progress');
+                    
+                    // Move to in-progress
+                    if (planned.length > 0) {
+                        const count = Math.min(2, planned.length);
+                        for (let i = 0; i < count; i++) {
+                            planned[i].status = 'in-progress';
+                            changes.moved.push(planned[i].id);
+                        }
+                    }
+                    
+                    // Complete features
+                    if (inProgress.length > 0 && Math.random() > 0.3) {
+                        const count = Math.min(1, inProgress.length);
+                        for (let i = 0; i < count; i++) {
+                            inProgress[i].status = 'completed';
+                            completedPoints += inProgress[i].points;
+                            changes.completed.push(inProgress[i].id);
+                        }
+                    }
+                }
+                
+                // Add dependencies
+                if (day % 10 === 0 && day > 0) {
+                    const features = currentNodes.filter(n => n.type === 'feature' && n.status !== 'completed');
+                    if (features.length > 2) {
+                        for (let i = 0; i < 2; i++) {
+                            const source = features[Math.floor(Math.random() * features.length)];
+                            const target = features[Math.floor(Math.random() * features.length)];
+                            if (source.id !== target.id) {
+                                currentLinks.push({
+                                    source: source.id,
+                                    target: target.id,
+                                    type: 'dependency'
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                // Calculate metrics
+                const features = currentNodes.filter(n => n.type === 'feature');
+                const totalPoints = features.reduce((sum, f) => sum + (f.points || 0), 0);
+                const velocity = day > 0 ? Math.round(completedPoints / (day / 14 || 1)) : 0;
+                const dependencies = currentLinks.filter(l => l.type === 'dependency').length;
+                
+                snapshots.push({
+                    date: date.toISOString().split('T')[0],
+                    dateDisplay: date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+                    sprint,
+                    sprintDay,
+                    nodes: JSON.parse(JSON.stringify(currentNodes)),
+                    links: JSON.parse(JSON.stringify(currentLinks)),
+                    changes,
+                    metrics: { totalPoints, completedPoints, velocity, teams: teams.length, dependencies }
+                });
+            }
+            
+            return snapshots;
+        }
+        
+        // Initialize
+        const timelapseData = generateTimelapseData();
+        let currentIndex = 0;
+        let isPlaying = false;
+        let playbackSpeed = 1.0;
+        let playInterval = null;
+        
+        const width = window.innerWidth;
+        const height = window.innerHeight - 280;
+        console.log('Dimensions:', { width, height });
+        
+        // Create SVG
+        const svg = d3.select('#visualization')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        
+        const g = svg.append('g');
+        
+        // Add zoom
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        // Color scale
+        const colorScale = d3.scaleOrdinal()
+            .domain([1, 2, 3])
+            .range(['#667eea', '#f39c12', '#27ae60']);
+        
+        // Log for debugging
+        console.log('Timeline data generated:', timelapseData.length, 'snapshots');
+        console.log('First snapshot:', timelapseData[0]);
+        
+        // Initialize timeline labels
+        const timelineLabels = document.getElementById('timelineLabels');
+        for (let sprint = 1; sprint <= 7; sprint++) {
+            const marker = document.createElement('div');
+            marker.className = 'sprint-marker';
+            marker.textContent = `Sprint ${sprint}`;
+            marker.style.position = 'absolute';
+            marker.style.left = `${((sprint - 1) * 14 / 90) * 100}%`;
+            timelineLabels.appendChild(marker);
+        }
+        
+        // Update visualization with force simulation
+        function updateVisualizationWithSpacing(snapshot) {
+            console.log('Updating visualization with snapshot:', snapshot);
+            // Clear previous
+            g.selectAll('*').remove();
+            
+            // Create a copy of nodes for simulation
+            const simNodes = snapshot.nodes.map(d => ({...d}));
+            const simLinks = snapshot.links.map(d => ({...d}));
+            
+            // Create force simulation with adjustable spacing
+            const simulation = d3.forceSimulation(simNodes)
+                .force('link', d3.forceLink(simLinks)
+                    .id(d => d.id)
+                    .distance(currentSpacing * 0.8))
+                .force('charge', d3.forceManyBody()
+                    .strength(-currentSpacing * 2)
+                    .distanceMax(currentSpacing * 3))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide()
+                    .radius(d => d.type === 'team' ? currentSpacing * 0.3 : currentSpacing * 0.15))
+                .force('x', d3.forceX(width / 2).strength(0.05))
+                .force('y', d3.forceY(height / 2).strength(0.05))
+                .stop();
+            
+            // Run simulation synchronously
+            for (let i = 0; i < 100; ++i) simulation.tick();
+            
+            // Create links
+            const link = g.append('g')
+                .selectAll('line')
+                .data(simLinks)
+                .enter()
+                .append('line')
+                .attr('class', d => `link ${d.type}`)
+                .attr('stroke', d => d.type === 'dependency' ? '#ff6b6b' : '#999')
+                .attr('stroke-width', 2)
+                .attr('stroke-opacity', 0.6)
+                .attr('stroke-dasharray', d => d.type === 'dependency' ? '5,5' : null);
+            
+            // Create node groups
+            console.log('Creating nodes:', simNodes.length, 'nodes');
+            const node = g.append('g')
+                .selectAll('g')
+                .data(simNodes)
+                .enter()
+                .append('g')
+                .attr('class', d => {
+                    let classes = 'node';
+                    if (snapshot.changes && snapshot.changes.added && snapshot.changes.added.includes(d.id)) classes += ' new';
+                    if (snapshot.changes && snapshot.changes.completed && snapshot.changes.completed.includes(d.id)) classes += ' completed';
+                    return classes;
+                })
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+            
+            // Add circles
+            node.append('circle')
+                .attr('r', d => {
+                    if (d.type === 'team') return 35;
+                    if (d.type === 'feature') return 20;
+                    return 15;
+                })
+                .attr('fill', d => {
+                    if (d.type === 'team') {
+                        return '#27ae60';
+                    }
+                    if (d.type === 'feature') {
+                        return '#667eea';
+                    }
+                    if (d.type === 'story') {
+                        return '#3498db';
+                    }
+                    if (d.status === 'completed') return '#2ecc71';
+                    if (d.status === 'in-progress') return '#f39c12';
+                    return '#667eea';
+                })
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 3)
+                .attr('cursor', 'move');
+            
+            // Add labels with background
+            const labelGroup = node.append('g');
+            
+            // Add white background for better readability
+            labelGroup.append('rect')
+                .attr('x', d => d.type === 'team' ? -40 : -30)
+                .attr('y', d => d.type === 'team' ? -50 : -25)
+                .attr('width', d => d.type === 'team' ? 80 : 60)
+                .attr('height', 18)
+                .attr('fill', 'white')
+                .attr('opacity', 0.9)
+                .attr('rx', 3);
+            
+            labelGroup.append('text')
+                .text(d => d.name)
+                .attr('x', 0)
+                .attr('y', d => d.type === 'team' ? -35 : -12)
+                .attr('text-anchor', 'middle')
+                .style('font-size', d => d.type === 'team' ? '14px' : '11px')
+                .style('font-weight', d => d.type === 'team' ? 'bold' : 'normal')
+                .style('fill', '#333');
+            
+            // Add capacity indicator for teams
+            node.filter(d => d.type === 'team').append('text')
+                .text(d => `${Math.round(d.allocated || 0)}/${d.capacity}`)
+                .attr('x', 0)
+                .attr('y', 5)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '10px')
+                .style('fill', '#666');
+            
+            // Position nodes with simulation results
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+            
+            // Update links with simulation results
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            
+            // Drag functions
+            function dragstarted(event, d) {
+                d3.select(this).raise().attr('cursor', 'grabbing');
+            }
+            
+            function dragged(event, d) {
+                d.x = event.x;
+                d.y = event.y;
+                d3.select(this).attr('transform', `translate(${d.x},${d.y})`);
+                
+                // Update connected links
+                link.filter(l => l.source.id === d.id)
+                    .attr('x1', d.x)
+                    .attr('y1', d.y);
+                link.filter(l => l.target.id === d.id)
+                    .attr('x2', d.x)
+                    .attr('y2', d.y);
+            }
+            
+            function dragended(event, d) {
+                d3.select(this).attr('cursor', 'move');
+            }
+        }
+        
+        // Keep original function for compatibility
+        function updateVisualization(snapshot) {
+            updateVisualizationWithSpacing(snapshot);
+            
+            // Update UI
+            document.getElementById('currentDate').textContent = snapshot.dateDisplay;
+            document.getElementById('sprintInfo').textContent = `Sprint ${snapshot.sprint} - Day ${snapshot.sprintDay}`;
+            document.getElementById('completedPoints').textContent = snapshot.metrics.completedPoints;
+            document.getElementById('totalPoints').textContent = snapshot.metrics.totalPoints;
+            document.getElementById('velocity').textContent = snapshot.metrics.velocity;
+            document.getElementById('dependencies').textContent = snapshot.metrics.dependencies;
+            
+            // Update change indicators
+            const changeIndicators = document.getElementById('changeIndicators');
+            changeIndicators.innerHTML = '';
+            
+            if (snapshot.changes.added.length > 0) {
+                const indicator = document.createElement('div');
+                indicator.className = 'change-indicator added';
+                indicator.textContent = `+${snapshot.changes.added.length} added`;
+                changeIndicators.appendChild(indicator);
+            }
+            
+            if (snapshot.changes.moved.length > 0) {
+                const indicator = document.createElement('div');
+                indicator.className = 'change-indicator moved';
+                indicator.textContent = `↔${snapshot.changes.moved.length} moved`;
+                changeIndicators.appendChild(indicator);
+            }
+            
+            if (snapshot.changes.completed.length > 0) {
+                const indicator = document.createElement('div');
+                indicator.className = 'change-indicator completed';
+                indicator.textContent = `✓${snapshot.changes.completed.length} completed`;
+                changeIndicators.appendChild(indicator);
+            }
+            
+            // Update slider progress
+            const slider = document.getElementById('timelineSlider');
+            slider.style.setProperty('--progress', `${(currentIndex / 89) * 100}%`);
+        }
+        
+        // Playback controls
+        function play() {
+            if (isPlaying) return;
+            isPlaying = true;
+            document.getElementById('btn-play').innerHTML = '⏸ Pause';
+            
+            playInterval = setInterval(() => {
+                if (currentIndex < timelapseData.length - 1) {
+                    currentIndex++;
+                    document.getElementById('timelineSlider').value = currentIndex;
+                    updateVisualization(timelapseData[currentIndex]);
+                } else {
+                    pause();
+                }
+            }, 500 / playbackSpeed);
+        }
+        
+        function pause() {
+            isPlaying = false;
+            document.getElementById('btn-play').innerHTML = '▶️ Play';
+            if (playInterval) {
+                clearInterval(playInterval);
+                playInterval = null;
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('btn-play').addEventListener('click', () => {
+            if (isPlaying) {
+                pause();
+            } else {
+                play();
+            }
+        });
+        
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            pause();
+            if (currentIndex > 0) {
+                currentIndex--;
+                document.getElementById('timelineSlider').value = currentIndex;
+                updateVisualization(timelapseData[currentIndex]);
+            }
+        });
+        
+        document.getElementById('btn-next').addEventListener('click', () => {
+            pause();
+            if (currentIndex < timelapseData.length - 1) {
+                currentIndex++;
+                document.getElementById('timelineSlider').value = currentIndex;
+                updateVisualization(timelapseData[currentIndex]);
+            }
+        });
+        
+        document.getElementById('btn-start').addEventListener('click', () => {
+            pause();
+            currentIndex = 0;
+            document.getElementById('timelineSlider').value = currentIndex;
+            updateVisualization(timelapseData[currentIndex]);
+        });
+        
+        document.getElementById('btn-end').addEventListener('click', () => {
+            pause();
+            currentIndex = timelapseData.length - 1;
+            document.getElementById('timelineSlider').value = currentIndex;
+            updateVisualization(timelapseData[currentIndex]);
+        });
+        
+        document.getElementById('timelineSlider').addEventListener('input', (e) => {
+            pause();
+            currentIndex = parseInt(e.target.value);
+            updateVisualization(timelapseData[currentIndex]);
+        });
+        
+        // Speed controls
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                playbackSpeed = parseFloat(btn.dataset.speed);
+                if (isPlaying) {
+                    pause();
+                    play();
+                }
+            });
+        });
+        
+        // Initialize with first snapshot
+        console.log('Initializing visualization with first snapshot');
+        if (timelapseData && timelapseData.length > 0) {
+            updateVisualization(timelapseData[0]);
+        } else {
+            console.error('No timeline data available');
+        }
+    </script>
+</body>
+</html>

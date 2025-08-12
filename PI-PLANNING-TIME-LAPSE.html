@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning Time-Lapse Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .date-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .sprint-info {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        #visualization {
+            width: 100%;
+            height: calc(100vh - 250px);
+            background: white;
+            position: relative;
+        }
+        
+        .controls-panel {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 20px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 180px;
+        }
+        
+        .timeline-container {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .timeline-slider {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #ddd;
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .timeline-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .timeline-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .sprint-marker {
+            position: relative;
+            text-align: center;
+        }
+        
+        .sprint-marker::before {
+            content: '|';
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #999;
+        }
+        
+        .playback-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 15px 0;
+        }
+        
+        .control-btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .control-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .control-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .speed-controls {
+            display: flex;
+            gap: 5px;
+            margin-left: 20px;
+            align-items: center;
+        }
+        
+        .speed-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: white;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .speed-btn:hover, .speed-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .metrics-panel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-width: 200px;
+        }
+        
+        .metric-item {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .metric-value {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .changes-panel {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-width: 180px;
+        }
+        
+        .change-item {
+            margin: 5px 0;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .change-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .added { background: #4caf50; }
+        .moved { background: #2196f3; }
+        .completed { background: #ff9800; }
+        .removed { background: #f44336; }
+        
+        .team-node {
+            fill: #f0f4f8;
+            stroke: #667eea;
+            stroke-width: 3;
+            transition: all 0.5s;
+        }
+        
+        .epic-node {
+            fill: #ffd93d;
+            stroke: #f39c12;
+            stroke-width: 2;
+            transition: all 0.5s;
+        }
+        
+        .feature-node {
+            fill: #6bcf7f;
+            stroke: #27ae60;
+            stroke-width: 2;
+            transition: all 0.5s;
+        }
+        
+        .feature-node.completed {
+            fill: #27ae60;
+            opacity: 0.8;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.4;
+            stroke-width: 2;
+            transition: all 0.5s;
+        }
+        
+        .link-dependency {
+            stroke: #e74c3c;
+            stroke-dasharray: 5, 5;
+        }
+        
+        .node-label {
+            font-size: 11px;
+            font-weight: 600;
+            fill: #333;
+            pointer-events: none;
+            text-anchor: middle;
+        }
+        
+        .highlight-new {
+            animation: fadeIn 1s;
+        }
+        
+        .highlight-removed {
+            animation: fadeOut 1s;
+            opacity: 0.3;
+        }
+        
+        .highlight-moved {
+            stroke: #2196f3 !important;
+            stroke-width: 4 !important;
+            filter: drop-shadow(0 0 10px #2196f3);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0.3; }
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎬 PI Planning Time-Lapse - Q1 2025</h1>
+        <div>
+            <div class="date-display" id="current-date">March 1, 2025</div>
+            <div class="sprint-info" id="sprint-info">Sprint 1, Day 1</div>
+        </div>
+    </div>
+    
+    <div id="visualization"></div>
+    
+    <div class="changes-panel">
+        <h4>Today's Changes</h4>
+        <div id="changes-list">
+            <div class="change-item">
+                <div class="change-indicator added"></div>
+                <span id="added-count">0 Added</span>
+            </div>
+            <div class="change-item">
+                <div class="change-indicator moved"></div>
+                <span id="moved-count">0 Moved</span>
+            </div>
+            <div class="change-item">
+                <div class="change-indicator completed"></div>
+                <span id="completed-count">0 Completed</span>
+            </div>
+            <div class="change-item">
+                <div class="change-indicator removed"></div>
+                <span id="removed-count">0 Removed</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="metrics-panel">
+        <h4>PI Metrics</h4>
+        <div class="metric-item">
+            <span class="metric-label">Progress:</span>
+            <span class="metric-value" id="progress-metric">0/520 pts</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Velocity:</span>
+            <span class="metric-value" id="velocity-metric">0 pts/day</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Teams:</span>
+            <span class="metric-value" id="teams-metric">5</span>
+        </div>
+        <div class="metric-item">
+            <span class="metric-label">Dependencies:</span>
+            <span class="metric-value" id="deps-metric">8</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-bar" style="width: 0%"></div>
+        </div>
+    </div>
+    
+    <div class="controls-panel">
+        <div class="timeline-container">
+            <input type="range" 
+                   id="timeline-slider" 
+                   class="timeline-slider"
+                   min="0" 
+                   max="89" 
+                   value="0" 
+                   step="1">
+            <div class="timeline-labels">
+                <span class="sprint-marker">Sprint 1<br>Mar 1</span>
+                <span class="sprint-marker">Sprint 2<br>Mar 15</span>
+                <span class="sprint-marker">Sprint 3<br>Mar 29</span>
+                <span class="sprint-marker">Sprint 4<br>Apr 12</span>
+                <span class="sprint-marker">Sprint 5<br>Apr 26</span>
+                <span class="sprint-marker">Sprint 6<br>May 10</span>
+            </div>
+        </div>
+        
+        <div class="playback-controls">
+            <button class="control-btn" id="btn-start" title="Jump to Start">⏮️</button>
+            <button class="control-btn" id="btn-prev" title="Previous Day">⏪</button>
+            <button class="control-btn" id="btn-play" title="Play/Pause">▶️ Play</button>
+            <button class="control-btn" id="btn-next" title="Next Day">⏩</button>
+            <button class="control-btn" id="btn-end" title="Jump to End">⏭️</button>
+            
+            <div class="speed-controls">
+                <label>Speed:</label>
+                <button class="speed-btn" data-speed="0.5">0.5x</button>
+                <button class="speed-btn active" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="2">2x</button>
+                <button class="speed-btn" data-speed="5">5x</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Generate 90 days of simulated PI planning evolution
+        function generateTimelapseData() {
+            const snapshots = [];
+            const startDate = new Date('2025-03-01');
+            const teams = [
+                { id: 'team-1', name: 'Platform Services', x: 200, y: 200 },
+                { id: 'team-2', name: 'Digital Delivery', x: 600, y: 200 },
+                { id: 'team-3', name: 'Data Analytics', x: 1000, y: 200 },
+                { id: 'team-4', name: 'Customer Experience', x: 400, y: 500 },
+                { id: 'team-5', name: 'Infrastructure', x: 800, y: 500 }
+            ];
+            
+            // Initial state
+            let currentNodes = [...teams];
+            let currentLinks = [];
+            let completedPoints = 0;
+            let featureId = 1;
+            
+            for (let day = 0; day < 90; day++) {
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + day);
+                const sprint = Math.floor(day / 14) + 1;
+                const sprintDay = (day % 14) + 1;
+                
+                const changes = {
+                    added: [],
+                    moved: [],
+                    completed: [],
+                    removed: []
+                };
+                
+                // Simulate planning evolution
+                if (day === 0) {
+                    // Initial PI planning - add all features
+                    for (let i = 0; i < 15; i++) {
+                        const teamIndex = i % 5;
+                        const feature = {
+                            id: `feat-${featureId++}`,
+                            name: `Feature ${featureId}`,
+                            type: 'feature',
+                            team: teams[teamIndex].id,
+                            points: 5 + Math.floor(Math.random() * 15),
+                            status: 'planned',
+                            x: teams[teamIndex].x + (Math.random() - 0.5) * 100,
+                            y: teams[teamIndex].y + (Math.random() - 0.5) * 100
+                        };
+                        currentNodes.push(feature);
+                        changes.added.push(feature.id);
+                        
+                        // Add link to team
+                        currentLinks.push({
+                            source: teams[teamIndex].id,
+                            target: feature.id,
+                            type: 'assignment'
+                        });
+                    }
+                } else if (day % 7 === 0) {
+                    // Weekly changes
+                    // Move a feature between teams
+                    const features = currentNodes.filter(n => n.type === 'feature' && n.status !== 'completed');
+                    if (features.length > 0) {
+                        const feature = features[Math.floor(Math.random() * features.length)];
+                        const newTeam = teams[Math.floor(Math.random() * teams.length)];
+                        if (feature.team !== newTeam.id) {
+                            feature.team = newTeam.id;
+                            feature.x = newTeam.x + (Math.random() - 0.5) * 100;
+                            feature.y = newTeam.y + (Math.random() - 0.5) * 100;
+                            changes.moved.push(feature.id);
+                            
+                            // Update links
+                            currentLinks = currentLinks.filter(l => l.target !== feature.id || l.type !== 'assignment');
+                            currentLinks.push({
+                                source: newTeam.id,
+                                target: feature.id,
+                                type: 'assignment'
+                            });
+                        }
+                    }
+                    
+                    // Add new feature occasionally
+                    if (Math.random() > 0.7) {
+                        const teamIndex = Math.floor(Math.random() * 5);
+                        const feature = {
+                            id: `feat-${featureId++}`,
+                            name: `Feature ${featureId}`,
+                            type: 'feature',
+                            team: teams[teamIndex].id,
+                            points: 5 + Math.floor(Math.random() * 10),
+                            status: 'planned',
+                            x: teams[teamIndex].x + (Math.random() - 0.5) * 100,
+                            y: teams[teamIndex].y + (Math.random() - 0.5) * 100
+                        };
+                        currentNodes.push(feature);
+                        changes.added.push(feature.id);
+                        currentLinks.push({
+                            source: teams[teamIndex].id,
+                            target: feature.id,
+                            type: 'assignment'
+                        });
+                    }
+                } 
+                
+                // Complete features progressively
+                if (day > 7 && day % 3 === 0) {
+                    const inProgress = currentNodes.filter(n => n.type === 'feature' && n.status === 'in-progress');
+                    const planned = currentNodes.filter(n => n.type === 'feature' && n.status === 'planned');
+                    
+                    // Complete in-progress features
+                    if (inProgress.length > 0 && Math.random() > 0.5) {
+                        const feature = inProgress[0];
+                        feature.status = 'completed';
+                        completedPoints += feature.points;
+                        changes.completed.push(feature.id);
+                    }
+                    
+                    // Move planned to in-progress
+                    if (planned.length > 0 && Math.random() > 0.3) {
+                        const feature = planned[Math.floor(Math.random() * planned.length)];
+                        feature.status = 'in-progress';
+                    }
+                }
+                
+                // Add dependencies
+                if (day % 10 === 0 && currentLinks.length < 30) {
+                    const features = currentNodes.filter(n => n.type === 'feature');
+                    if (features.length > 2) {
+                        const source = features[Math.floor(Math.random() * features.length)];
+                        const target = features[Math.floor(Math.random() * features.length)];
+                        if (source.id !== target.id) {
+                            currentLinks.push({
+                                source: source.id,
+                                target: target.id,
+                                type: 'dependency'
+                            });
+                        }
+                    }
+                }
+                
+                // Calculate metrics
+                const totalPoints = currentNodes.filter(n => n.type === 'feature').reduce((sum, f) => sum + f.points, 0);
+                const velocity = day > 0 ? Math.round(completedPoints / day) : 0;
+                const dependencies = currentLinks.filter(l => l.type === 'dependency').length;
+                
+                snapshots.push({
+                    date: date.toISOString().split('T')[0],
+                    dateDisplay: date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+                    sprint: sprint,
+                    sprintDay: sprintDay,
+                    nodes: JSON.parse(JSON.stringify(currentNodes)),
+                    links: JSON.parse(JSON.stringify(currentLinks)),
+                    changes: changes,
+                    metrics: {
+                        totalPoints: totalPoints,
+                        completedPoints: completedPoints,
+                        velocity: velocity,
+                        teams: 5,
+                        dependencies: dependencies
+                    }
+                });
+            }
+            
+            return snapshots;
+        }
+        
+        // Initialize data
+        const timelapseData = generateTimelapseData();
+        let currentIndex = 0;
+        let isPlaying = false;
+        let playbackSpeed = 1.0;
+        let playInterval = null;
+        
+        // Set up dimensions
+        const width = window.innerWidth;
+        const height = window.innerHeight - 250;
+        
+        // Create SVG
+        const svg = d3.select('#visualization')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        
+        const g = svg.append('g');
+        
+        // Add zoom
+        const zoom = d3.zoom()
+            .scaleExtent([0.3, 3])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        // Initialize visualization
+        let link = g.append('g').selectAll('.link');
+        let node = g.append('g').selectAll('.node');
+        
+        // Update visualization
+        function updateVisualization(snapshot, animate = true) {
+            const duration = animate ? 750 / playbackSpeed : 0;
+            
+            // Update links
+            link = link.data(snapshot.links, d => `${d.source}-${d.target}`);
+            
+            link.exit()
+                .transition()
+                .duration(duration)
+                .style('opacity', 0)
+                .remove();
+            
+            const linkEnter = link.enter()
+                .append('line')
+                .attr('class', d => `link link-${d.type}`)
+                .style('opacity', 0);
+            
+            link = linkEnter.merge(link);
+            
+            link.transition()
+                .duration(duration)
+                .style('opacity', 1)
+                .attr('x1', d => {
+                    const source = snapshot.nodes.find(n => n.id === d.source);
+                    return source ? source.x : 0;
+                })
+                .attr('y1', d => {
+                    const source = snapshot.nodes.find(n => n.id === d.source);
+                    return source ? source.y : 0;
+                })
+                .attr('x2', d => {
+                    const target = snapshot.nodes.find(n => n.id === d.target);
+                    return target ? target.x : 0;
+                })
+                .attr('y2', d => {
+                    const target = snapshot.nodes.find(n => n.id === d.target);
+                    return target ? target.y : 0;
+                });
+            
+            // Update nodes
+            node = node.data(snapshot.nodes, d => d.id);
+            
+            node.exit()
+                .classed('highlight-removed', true)
+                .transition()
+                .duration(duration)
+                .style('opacity', 0)
+                .remove();
+            
+            const nodeEnter = node.enter()
+                .append('g')
+                .attr('class', 'node-group')
+                .attr('transform', d => `translate(${d.x},${d.y})`);
+            
+            nodeEnter.append('circle')
+                .attr('class', d => {
+                    if (d.id.startsWith('team-')) return 'node team-node';
+                    if (d.type === 'epic') return 'node epic-node';
+                    return 'node feature-node';
+                })
+                .attr('r', d => {
+                    if (d.id.startsWith('team-')) return 40;
+                    if (d.type === 'epic') return 30;
+                    return 20;
+                });
+            
+            nodeEnter.append('text')
+                .attr('class', 'node-label')
+                .attr('dy', 3)
+                .text(d => d.name);
+            
+            node = nodeEnter.merge(node);
+            
+            // Apply highlights
+            node.classed('highlight-new', d => snapshot.changes.added.includes(d.id))
+                .classed('highlight-moved', d => snapshot.changes.moved.includes(d.id))
+                .classed('highlight-removed', false);
+            
+            node.select('circle')
+                .classed('completed', d => d.status === 'completed');
+            
+            node.transition()
+                .duration(duration)
+                .attr('transform', d => `translate(${d.x},${d.y})`);
+            
+            // Update UI
+            document.getElementById('current-date').textContent = snapshot.dateDisplay;
+            document.getElementById('sprint-info').textContent = `Sprint ${snapshot.sprint}, Day ${snapshot.sprintDay}`;
+            document.getElementById('added-count').textContent = `${snapshot.changes.added.length} Added`;
+            document.getElementById('moved-count').textContent = `${snapshot.changes.moved.length} Moved`;
+            document.getElementById('completed-count').textContent = `${snapshot.changes.completed.length} Completed`;
+            document.getElementById('removed-count').textContent = `${snapshot.changes.removed.length} Removed`;
+            document.getElementById('progress-metric').textContent = `${snapshot.metrics.completedPoints}/${snapshot.metrics.totalPoints} pts`;
+            document.getElementById('velocity-metric').textContent = `${snapshot.metrics.velocity} pts/day`;
+            document.getElementById('teams-metric').textContent = snapshot.metrics.teams;
+            document.getElementById('deps-metric').textContent = snapshot.metrics.dependencies;
+            
+            const progressPercent = (snapshot.metrics.completedPoints / snapshot.metrics.totalPoints) * 100;
+            document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+        }
+        
+        // Playback functions
+        function play() {
+            if (currentIndex >= timelapseData.length - 1) {
+                currentIndex = 0;
+            }
+            
+            isPlaying = true;
+            document.getElementById('btn-play').innerHTML = '⏸️ Pause';
+            
+            playInterval = setInterval(() => {
+                if (currentIndex < timelapseData.length - 1) {
+                    currentIndex++;
+                    document.getElementById('timeline-slider').value = currentIndex;
+                    updateVisualization(timelapseData[currentIndex]);
+                } else {
+                    pause();
+                }
+            }, 1000 / playbackSpeed);
+        }
+        
+        function pause() {
+            isPlaying = false;
+            document.getElementById('btn-play').innerHTML = '▶️ Play';
+            if (playInterval) {
+                clearInterval(playInterval);
+                playInterval = null;
+            }
+        }
+        
+        function goToIndex(index) {
+            currentIndex = Math.max(0, Math.min(index, timelapseData.length - 1));
+            document.getElementById('timeline-slider').value = currentIndex;
+            updateVisualization(timelapseData[currentIndex]);
+        }
+        
+        // Event listeners
+        document.getElementById('btn-play').addEventListener('click', () => {
+            if (isPlaying) {
+                pause();
+            } else {
+                play();
+            }
+        });
+        
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            pause();
+            goToIndex(currentIndex - 1);
+        });
+        
+        document.getElementById('btn-next').addEventListener('click', () => {
+            pause();
+            goToIndex(currentIndex + 1);
+        });
+        
+        document.getElementById('btn-start').addEventListener('click', () => {
+            pause();
+            goToIndex(0);
+        });
+        
+        document.getElementById('btn-end').addEventListener('click', () => {
+            pause();
+            goToIndex(timelapseData.length - 1);
+        });
+        
+        document.getElementById('timeline-slider').addEventListener('input', (e) => {
+            pause();
+            goToIndex(parseInt(e.target.value));
+        });
+        
+        // Speed controls
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                playbackSpeed = parseFloat(btn.dataset.speed);
+                if (isPlaying) {
+                    pause();
+                    play();
+                }
+            });
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    if (isPlaying) pause();
+                    else play();
+                    break;
+                case 'ArrowLeft':
+                    pause();
+                    goToIndex(currentIndex - 1);
+                    break;
+                case 'ArrowRight':
+                    pause();
+                    goToIndex(currentIndex + 1);
+                    break;
+                case 'Home':
+                    pause();
+                    goToIndex(0);
+                    break;
+                case 'End':
+                    pause();
+                    goToIndex(timelapseData.length - 1);
+                    break;
+                case '1':
+                    playbackSpeed = 1;
+                    document.querySelector('[data-speed="1"]').click();
+                    break;
+                case '2':
+                    playbackSpeed = 2;
+                    document.querySelector('[data-speed="2"]').click();
+                    break;
+                case '5':
+                    playbackSpeed = 5;
+                    document.querySelector('[data-speed="5"]').click();
+                    break;
+            }
+        });
+        
+        // Initialize
+        updateVisualization(timelapseData[0], false);
+    </script>
+</body>
+</html>

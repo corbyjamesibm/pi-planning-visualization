@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning - Sprint Organization Fixed</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            padding: 20px;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+        }
+        
+        .grid-container {
+            display: grid;
+            grid-template-columns: 120px repeat(8, 1fr);
+            grid-template-rows: 80px repeat(5, minmax(100px, auto));
+            gap: 1px;
+            background: #ddd;
+            margin: 20px;
+        }
+        
+        .cell {
+            background: white;
+            padding: 8px;
+            min-height: 100px;
+        }
+        
+        .header-cell {
+            background: #f8f9fa;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .sprint-label {
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .team-name {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        
+        .team-velocity {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        
+        .capacity-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        
+        .capacity-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        
+        .capacity-fill.green { background: #27ae60; }
+        .capacity-fill.yellow { background: #f39c12; }
+        .capacity-fill.red { background: #e74c3c; }
+        
+        .story-card {
+            background: white;
+            border-left: 3px solid #667eea;
+            border-radius: 4px;
+            padding: 6px;
+            margin-bottom: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .story-card:hover {
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            transform: translateX(2px);
+        }
+        
+        .story-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .story-points {
+            background: #667eea;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 4px;
+        }
+        
+        .sprint-1 { border-left-color: #667eea; }
+        .sprint-2 { border-left-color: #764ba2; }
+        .sprint-3 { border-left-color: #27ae60; }
+        .sprint-4 { border-left-color: #3498db; }
+        .sprint-5 { border-left-color: #f39c12; }
+        
+        .corner-cell {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .metrics {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 2px solid #e0e0e0;
+            display: flex;
+            gap: 30px;
+        }
+        
+        .metric {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .metric-label {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        
+        .metric-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .objectives-panel {
+            position: fixed;
+            right: 20px;
+            top: 100px;
+            width: 300px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .objective-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+        }
+        
+        .objective-item.committed {
+            background: #d4f4dd;
+            border-left: 3px solid #27ae60;
+        }
+        
+        .objective-item.uncommitted {
+            background: #fff3cd;
+            border-left: 3px solid #f39c12;
+        }
+        
+        .objective-item.stretch {
+            background: #e3f2fd;
+            border-left: 3px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 PI Planning - Sprint Organization</h1>
+            <div>PI: Q1 2025</div>
+        </div>
+        
+        <div class="grid-container" id="grid">
+            <!-- Grid will be populated by JavaScript -->
+        </div>
+        
+        <div class="metrics" id="metrics">
+            <div class="metric">
+                <span class="metric-label">Total Points</span>
+                <span class="metric-value" id="totalPoints">0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Teams</span>
+                <span class="metric-value" id="teamCount">8</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Avg Velocity</span>
+                <span class="metric-value" id="avgVelocity">0</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Committed Objectives</span>
+                <span class="metric-value" id="committedObj">0</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="objectives-panel">
+        <h3 style="margin-bottom: 15px; color: #333;">Team PI Objectives</h3>
+        <div id="objectivesList"></div>
+    </div>
+    
+    <script>
+        // Teams with velocities
+        const teams = [
+            { id: 'team-1', name: 'Platform Core', velocity: 21, capacity: 84 },
+            { id: 'team-2', name: 'Mobile Experience', velocity: 13, capacity: 52 },
+            { id: 'team-3', name: 'Data Services', velocity: 18, capacity: 72 },
+            { id: 'team-4', name: 'Customer Portal', velocity: 25, capacity: 100 },
+            { id: 'team-5', name: 'API Gateway', velocity: 15, capacity: 60 },
+            { id: 'team-6', name: 'DevOps', velocity: 11, capacity: 44 },
+            { id: 'team-7', name: 'Security', velocity: 8, capacity: 32 },
+            { id: 'team-8', name: 'Analytics', velocity: 20, capacity: 80 }
+        ];
+        
+        // PI Objectives
+        const objectives = {
+            'team-1': [
+                { title: 'OAuth 2.0 Implementation', value: 10, status: 'committed' },
+                { title: 'Database Migration', value: 8, status: 'committed' },
+                { title: 'Performance Optimization', value: 5, status: 'uncommitted' }
+            ],
+            'team-2': [
+                { title: 'iOS App Redesign', value: 10, status: 'committed' },
+                { title: 'Android Feature Parity', value: 8, status: 'committed' }
+            ],
+            'team-3': [
+                { title: 'Real-time Analytics', value: 10, status: 'committed' },
+                { title: 'Data Lake Integration', value: 7, status: 'stretch' }
+            ],
+            'team-4': [
+                { title: 'Self-Service Portal', value: 10, status: 'committed' },
+                { title: 'Notification System', value: 6, status: 'committed' }
+            ],
+            'team-5': [
+                { title: 'GraphQL API', value: 9, status: 'committed' },
+                { title: 'Rate Limiting', value: 7, status: 'committed' }
+            ],
+            'team-6': [
+                { title: 'CI/CD Pipeline', value: 10, status: 'committed' },
+                { title: 'Kubernetes Migration', value: 8, status: 'committed' }
+            ],
+            'team-7': [
+                { title: 'Security Audit', value: 10, status: 'committed' },
+                { title: 'PCI Compliance', value: 10, status: 'committed' }
+            ],
+            'team-8': [
+                { title: 'Executive Dashboard', value: 9, status: 'committed' },
+                { title: 'Predictive Models', value: 7, status: 'stretch' }
+            ]
+        };
+        
+        // Story templates
+        const storyTemplates = {
+            'Platform Core': ['User auth service', 'Session management', 'API gateway', 'Database pool', 'Cache layer'],
+            'Mobile Experience': ['Login UI', 'Push notifications', 'Offline sync', 'Dark mode', 'Navigation'],
+            'Data Services': ['ETL pipeline', 'Data validation', 'Report engine', 'Analytics API', 'Real-time processing'],
+            'Customer Portal': ['Registration flow', 'User dashboard', 'Billing page', 'Support tickets', 'Profile settings'],
+            'API Gateway': ['REST endpoints', 'GraphQL schema', 'Rate limiting', 'API docs', 'Auth middleware'],
+            'DevOps': ['CI pipeline', 'Deploy scripts', 'Monitoring', 'Log aggregation', 'Backup automation'],
+            'Security': ['Vulnerability scan', 'Access audit', 'SSL setup', 'Firewall rules', 'OWASP checks'],
+            'Analytics': ['KPI dashboard', 'User tracking', 'Conversion funnel', 'Custom reports', 'Data viz']
+        };
+        
+        // Generate stories for each team and sprint
+        function generateStories() {
+            const stories = {};
+            
+            teams.forEach(team => {
+                stories[team.id] = {};
+                const templates = storyTemplates[team.name] || ['Story'];
+                let templateIndex = 0;
+                
+                for (let sprint = 1; sprint <= 5; sprint++) {
+                    stories[team.id][sprint] = [];
+                    
+                    // Calculate stories for this sprint
+                    const sprintVelocity = sprint === 5 ? Math.floor(team.velocity * 0.3) : team.velocity;
+                    const numStories = Math.max(1, Math.floor(sprintVelocity / 5));
+                    
+                    for (let i = 0; i < numStories; i++) {
+                        const storyPoints = Math.floor(sprintVelocity / numStories) + (Math.random() > 0.5 ? 1 : 0);
+                        stories[team.id][sprint].push({
+                            name: templates[templateIndex % templates.length] + ` ${sprint}.${i + 1}`,
+                            points: Math.max(1, Math.min(8, storyPoints))
+                        });
+                        templateIndex++;
+                    }
+                }
+            });
+            
+            return stories;
+        }
+        
+        // Build the grid
+        function buildGrid() {
+            const grid = document.getElementById('grid');
+            const stories = generateStories();
+            
+            // Corner cell
+            const corner = document.createElement('div');
+            corner.className = 'corner-cell';
+            corner.textContent = 'Sprints / Teams';
+            grid.appendChild(corner);
+            
+            // Team headers
+            teams.forEach(team => {
+                const header = document.createElement('div');
+                header.className = 'header-cell';
+                
+                const capacityUsed = Object.values(stories[team.id])
+                    .flat()
+                    .reduce((sum, story) => sum + story.points, 0);
+                const capacityPercent = (capacityUsed / team.capacity) * 100;
+                
+                header.innerHTML = `
+                    <div class="team-name">${team.name}</div>
+                    <div class="team-velocity">Velocity: ${team.velocity} pts</div>
+                    <div class="capacity-bar">
+                        <div class="capacity-fill ${capacityPercent > 90 ? 'red' : capacityPercent > 70 ? 'yellow' : 'green'}" 
+                             style="width: ${capacityPercent}%"></div>
+                    </div>
+                    <div style="font-size: 10px; margin-top: 2px;">${capacityUsed}/${team.capacity} (${Math.round(capacityPercent)}%)</div>
+                `;
+                grid.appendChild(header);
+            });
+            
+            // Sprint rows
+            for (let sprint = 1; sprint <= 5; sprint++) {
+                // Sprint label
+                const label = document.createElement('div');
+                label.className = 'sprint-label';
+                label.textContent = sprint === 5 ? 'Sprint 5 (IP)' : `Sprint ${sprint}`;
+                grid.appendChild(label);
+                
+                // Team cells for this sprint
+                teams.forEach(team => {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    
+                    // Add stories
+                    const sprintStories = stories[team.id][sprint];
+                    sprintStories.forEach(story => {
+                        const card = document.createElement('div');
+                        card.className = `story-card sprint-${sprint}`;
+                        card.innerHTML = `
+                            <span class="story-name" title="${story.name}">${story.name}</span>
+                            <span class="story-points">${story.points}</span>
+                        `;
+                        cell.appendChild(card);
+                    });
+                    
+                    grid.appendChild(cell);
+                });
+            }
+            
+            // Update metrics
+            const allStories = Object.values(stories).flatMap(team => 
+                Object.values(team).flat()
+            );
+            const totalPoints = allStories.reduce((sum, story) => sum + story.points, 0);
+            const avgVelocity = Math.round(teams.reduce((sum, t) => sum + t.velocity, 0) / teams.length);
+            const committedObj = Object.values(objectives).flat()
+                .filter(obj => obj.status === 'committed').length;
+            
+            document.getElementById('totalPoints').textContent = totalPoints;
+            document.getElementById('avgVelocity').textContent = avgVelocity;
+            document.getElementById('committedObj').textContent = committedObj;
+            
+            // Build objectives panel
+            const objList = document.getElementById('objectivesList');
+            teams.forEach(team => {
+                const teamObj = objectives[team.id];
+                if (teamObj && teamObj.length > 0) {
+                    const teamSection = document.createElement('div');
+                    teamSection.style.marginBottom = '15px';
+                    teamSection.innerHTML = `<div style="font-weight: bold; font-size: 13px; margin-bottom: 5px;">${team.name}</div>`;
+                    
+                    teamObj.forEach(obj => {
+                        const objItem = document.createElement('div');
+                        objItem.className = `objective-item ${obj.status}`;
+                        objItem.innerHTML = `
+                            <span>${obj.title}</span>
+                            <span style="font-weight: bold; color: #667eea;">BV: ${obj.value}</span>
+                        `;
+                        teamSection.appendChild(objItem);
+                    });
+                    
+                    objList.appendChild(teamSection);
+                }
+            });
+        }
+        
+        // Initialize
+        buildGrid();
+    </script>
+</body>
+</html>

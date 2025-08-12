@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning Board - Team Cluster View</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .spacing-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #667eea;
+        }
+        
+        .spacing-control label {
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+        }
+        
+        .spacing-slider {
+            width: 180px;
+            cursor: pointer;
+        }
+        
+        .spacing-value {
+            min-width: 50px;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+        }
+        
+        .preset-btn {
+            padding: 6px 12px;
+            font-size: 13px;
+            background: white;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .preset-btn:hover, .preset-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        #visualization {
+            width: 100%;
+            height: calc(100vh - 80px);
+            background: white;
+            position: relative;
+        }
+        
+        .cluster-boundary {
+            fill: none;
+            stroke: #667eea;
+            stroke-width: 2;
+            stroke-dasharray: 5, 5;
+            opacity: 0.3;
+        }
+        
+        .cluster-label {
+            font-size: 16px;
+            font-weight: bold;
+            fill: #667eea;
+            text-anchor: middle;
+            opacity: 0.7;
+        }
+        
+        .team-node {
+            fill: #f0f4f8;
+            stroke: #667eea;
+            stroke-width: 3;
+        }
+        
+        .epic-node {
+            fill: #ffd93d;
+            stroke: #f39c12;
+            stroke-width: 2;
+        }
+        
+        .feature-node {
+            fill: #6bcf7f;
+            stroke: #27ae60;
+            stroke-width: 2;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.4;
+            stroke-width: 2;
+        }
+        
+        .link-dependency {
+            stroke: #e74c3c;
+            stroke-dasharray: 5, 5;
+            stroke-opacity: 0.6;
+        }
+        
+        .link-assignment {
+            stroke: #3498db;
+            stroke-opacity: 0.5;
+        }
+        
+        .node-label {
+            font-size: 11px;
+            font-weight: 600;
+            fill: #333;
+            pointer-events: none;
+            text-anchor: middle;
+        }
+        
+        .capacity-label {
+            font-size: 10px;
+            fill: #666;
+            text-anchor: middle;
+        }
+        
+        .tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 10px;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .view-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .view-btn {
+            display: block;
+            width: 100%;
+            margin: 5px 0;
+            padding: 8px;
+            background: white;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .view-btn:hover, .view-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .stats {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 14px;
+        }
+        
+        .stat-item {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 PI Planning Board - Team Cluster View</h1>
+        <div class="controls">
+            <div class="spacing-control">
+                <label>Cluster Spacing:</label>
+                <input type="range" 
+                       id="cluster-spacing-slider" 
+                       class="spacing-slider"
+                       min="100" 
+                       max="1000" 
+                       value="400" 
+                       step="50">
+                <span class="spacing-value" id="cluster-spacing-value">400</span>
+                <button class="preset-btn" onclick="setClusterSpacing(200)">Compact</button>
+                <button class="preset-btn active" onclick="setClusterSpacing(400)">Normal</button>
+                <button class="preset-btn" onclick="setClusterSpacing(600)">Spread</button>
+                <button class="preset-btn" onclick="setClusterSpacing(800)">Wide</button>
+            </div>
+            <button class="btn" onclick="fitAllClusters()">Fit All Teams</button>
+            <button class="btn" onclick="resetView()">Reset View</button>
+        </div>
+    </div>
+    
+    <div id="visualization"></div>
+    
+    <div class="stats">
+        <h3>PI Planning Stats</h3>
+        <div class="stat-item">
+            <span>Teams:</span>
+            <strong id="team-count">5</strong>
+        </div>
+        <div class="stat-item">
+            <span>Epics:</span>
+            <strong id="epic-count">8</strong>
+        </div>
+        <div class="stat-item">
+            <span>Features:</span>
+            <strong id="feature-count">24</strong>
+        </div>
+        <div class="stat-item">
+            <span>Dependencies:</span>
+            <strong id="dep-count">12</strong>
+        </div>
+        <div class="stat-item">
+            <span>Total Capacity:</span>
+            <strong id="capacity">520 pts</strong>
+        </div>
+    </div>
+    
+    <div class="view-controls">
+        <h4>Quick Views</h4>
+        <button class="view-btn" onclick="focusTeam('Platform Services')">Platform Services</button>
+        <button class="view-btn" onclick="focusTeam('Digital Delivery')">Digital Delivery</button>
+        <button class="view-btn" onclick="focusTeam('Data Analytics')">Data Analytics</button>
+        <button class="view-btn" onclick="focusTeam('Customer Experience')">Customer Experience</button>
+        <button class="view-btn" onclick="focusTeam('Infrastructure')">Infrastructure</button>
+        <button class="view-btn active" onclick="fitAllClusters()">All Teams</button>
+    </div>
+    
+    <div class="tooltip"></div>
+    
+    <script>
+        // Enhanced data with team clustering
+        const teams = [
+            { id: 'team-1', name: 'Platform Services', capacity: 120, used: 85, x: 0, y: 0 },
+            { id: 'team-2', name: 'Digital Delivery', capacity: 100, used: 92, x: 1, y: 0 },
+            { id: 'team-3', name: 'Data Analytics', capacity: 80, used: 65, x: 2, y: 0 },
+            { id: 'team-4', name: 'Customer Experience', capacity: 90, used: 78, x: 0, y: 1 },
+            { id: 'team-5', name: 'Infrastructure', capacity: 110, used: 95, x: 1, y: 1 }
+        ];
+        
+        const data = {
+            nodes: [
+                // Teams
+                ...teams,
+                
+                // Platform Services cluster
+                { id: 'epic-1', name: 'API Gateway 2.0', type: 'epic', points: 40, team: 'team-1', cluster: 0 },
+                { id: 'feat-1', name: 'Auth Service', type: 'feature', points: 13, team: 'team-1', cluster: 0 },
+                { id: 'feat-2', name: 'Rate Limiting', type: 'feature', points: 8, team: 'team-1', cluster: 0 },
+                { id: 'feat-11', name: 'OAuth 2.0', type: 'feature', points: 15, team: 'team-1', cluster: 0 },
+                
+                // Digital Delivery cluster
+                { id: 'epic-2', name: 'Customer Portal', type: 'epic', points: 35, team: 'team-2', cluster: 1 },
+                { id: 'feat-3', name: 'User Dashboard', type: 'feature', points: 15, team: 'team-2', cluster: 1 },
+                { id: 'feat-4', name: 'Payment Integration', type: 'feature', points: 20, team: 'team-2', cluster: 1 },
+                { id: 'feat-13', name: 'Profile Management', type: 'feature', points: 12, team: 'team-2', cluster: 1 },
+                
+                // Data Analytics cluster
+                { id: 'epic-3', name: 'Analytics Dashboard', type: 'epic', points: 30, team: 'team-3', cluster: 2 },
+                { id: 'feat-5', name: 'Real-time Charts', type: 'feature', points: 18, team: 'team-3', cluster: 2 },
+                { id: 'feat-6', name: 'Export Reports', type: 'feature', points: 12, team: 'team-3', cluster: 2 },
+                { id: 'feat-14', name: 'Data Pipeline', type: 'feature', points: 15, team: 'team-3', cluster: 2 },
+                
+                // Customer Experience cluster
+                { id: 'epic-4', name: 'Mobile App', type: 'epic', points: 45, team: 'team-4', cluster: 3 },
+                { id: 'feat-7', name: 'iOS App', type: 'feature', points: 25, team: 'team-4', cluster: 3 },
+                { id: 'feat-8', name: 'Android App', type: 'feature', points: 20, team: 'team-4', cluster: 3 },
+                { id: 'feat-15', name: 'Push Notifications', type: 'feature', points: 10, team: 'team-4', cluster: 3 },
+                
+                // Infrastructure cluster
+                { id: 'epic-5', name: 'Cloud Migration', type: 'epic', points: 50, team: 'team-5', cluster: 4 },
+                { id: 'feat-9', name: 'Database Migration', type: 'feature', points: 30, team: 'team-5', cluster: 4 },
+                { id: 'feat-10', name: 'Kubernetes Setup', type: 'feature', points: 20, team: 'team-5', cluster: 4 },
+                { id: 'feat-16', name: 'CI/CD Pipeline', type: 'feature', points: 15, team: 'team-5', cluster: 4 }
+            ],
+            links: [
+                // Team to Epic connections
+                { source: 'team-1', target: 'epic-1', type: 'assignment' },
+                { source: 'team-2', target: 'epic-2', type: 'assignment' },
+                { source: 'team-3', target: 'epic-3', type: 'assignment' },
+                { source: 'team-4', target: 'epic-4', type: 'assignment' },
+                { source: 'team-5', target: 'epic-5', type: 'assignment' },
+                
+                // Epic to Feature connections
+                { source: 'epic-1', target: 'feat-1', type: 'assignment' },
+                { source: 'epic-1', target: 'feat-2', type: 'assignment' },
+                { source: 'epic-1', target: 'feat-11', type: 'assignment' },
+                { source: 'epic-2', target: 'feat-3', type: 'assignment' },
+                { source: 'epic-2', target: 'feat-4', type: 'assignment' },
+                { source: 'epic-2', target: 'feat-13', type: 'assignment' },
+                { source: 'epic-3', target: 'feat-5', type: 'assignment' },
+                { source: 'epic-3', target: 'feat-6', type: 'assignment' },
+                { source: 'epic-3', target: 'feat-14', type: 'assignment' },
+                { source: 'epic-4', target: 'feat-7', type: 'assignment' },
+                { source: 'epic-4', target: 'feat-8', type: 'assignment' },
+                { source: 'epic-4', target: 'feat-15', type: 'assignment' },
+                { source: 'epic-5', target: 'feat-9', type: 'assignment' },
+                { source: 'epic-5', target: 'feat-10', type: 'assignment' },
+                { source: 'epic-5', target: 'feat-16', type: 'assignment' },
+                
+                // Cross-team dependencies
+                { source: 'feat-1', target: 'feat-3', type: 'dependency' },
+                { source: 'feat-1', target: 'feat-11', type: 'dependency' },
+                { source: 'feat-9', target: 'feat-10', type: 'dependency' },
+                { source: 'feat-5', target: 'feat-6', type: 'dependency' },
+                { source: 'feat-14', target: 'feat-5', type: 'dependency' },
+                { source: 'feat-2', target: 'feat-4', type: 'dependency' }
+            ]
+        };
+        
+        // Set up dimensions
+        const width = window.innerWidth;
+        const height = window.innerHeight - 80;
+        let currentClusterSpacing = 400;
+        
+        // Create SVG
+        const svg = d3.select('#visualization')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        
+        // Add zoom behavior
+        const g = svg.append('g');
+        
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        // Create cluster layout
+        function getClusterPosition(clusterId) {
+            const cols = 3;
+            const row = Math.floor(clusterId / cols);
+            const col = clusterId % cols;
+            return {
+                x: (col + 0.5) * currentClusterSpacing + (width / 2 - currentClusterSpacing * 1.5),
+                y: (row + 0.5) * currentClusterSpacing + (height / 2 - currentClusterSpacing)
+            };
+        }
+        
+        // Initialize node positions based on clusters
+        data.nodes.forEach(node => {
+            if (node.id.startsWith('team-')) {
+                const team = teams.find(t => t.id === node.id);
+                const clusterPos = getClusterPosition(teams.indexOf(team));
+                node.fx = clusterPos.x;
+                node.fy = clusterPos.y;
+                node.cluster = teams.indexOf(team);
+            } else {
+                // Position other nodes near their team
+                const teamNode = data.nodes.find(n => n.id === node.team);
+                if (teamNode) {
+                    const angle = Math.random() * 2 * Math.PI;
+                    const radius = 50 + Math.random() * 100;
+                    node.x = teamNode.fx + Math.cos(angle) * radius;
+                    node.y = teamNode.fy + Math.sin(angle) * radius;
+                }
+            }
+        });
+        
+        // Create force simulation with clustering
+        const simulation = d3.forceSimulation(data.nodes)
+            .force('link', d3.forceLink(data.links).id(d => d.id).distance(50).strength(0.5))
+            .force('charge', d3.forceManyBody().strength(d => d.id.startsWith('team-') ? -1000 : -200))
+            .force('collision', d3.forceCollide().radius(d => {
+                if (d.id.startsWith('team-')) return 60;
+                if (d.type === 'epic') return 40;
+                return 25;
+            }))
+            .force('cluster', forceCluster());
+        
+        // Custom clustering force
+        function forceCluster() {
+            let nodes;
+            
+            function force(alpha) {
+                const k = alpha * 0.1;
+                
+                nodes.forEach(node => {
+                    if (!node.id.startsWith('team-')) {
+                        const teamNode = nodes.find(n => n.id === node.team);
+                        if (teamNode) {
+                            node.vx -= (node.x - teamNode.x) * k;
+                            node.vy -= (node.y - teamNode.y) * k;
+                        }
+                    }
+                });
+            }
+            
+            force.initialize = function(_) {
+                nodes = _;
+            };
+            
+            return force;
+        }
+        
+        // Draw cluster boundaries
+        const clusterBoundaries = g.append('g')
+            .selectAll('.cluster-boundary')
+            .data(teams)
+            .enter().append('circle')
+            .attr('class', 'cluster-boundary')
+            .attr('r', currentClusterSpacing * 0.35);
+        
+        // Add cluster labels
+        const clusterLabels = g.append('g')
+            .selectAll('.cluster-label')
+            .data(teams)
+            .enter().append('text')
+            .attr('class', 'cluster-label')
+            .text(d => d.name.toUpperCase())
+            .attr('dy', -currentClusterSpacing * 0.35 - 10);
+        
+        // Create links
+        const link = g.append('g')
+            .selectAll('line')
+            .data(data.links)
+            .enter().append('line')
+            .attr('class', d => `link link-${d.type}`)
+            .attr('stroke-width', d => d.type === 'dependency' ? 2 : 3);
+        
+        // Create node groups
+        const node = g.append('g')
+            .selectAll('.node-group')
+            .data(data.nodes)
+            .enter().append('g')
+            .attr('class', 'node-group')
+            .call(drag(simulation));
+        
+        // Add circles for nodes
+        node.append('circle')
+            .attr('class', d => {
+                if (d.id.startsWith('team-')) return 'node team-node';
+                return `node ${d.type}-node`;
+            })
+            .attr('r', d => {
+                if (d.id.startsWith('team-')) return 50;
+                if (d.type === 'epic') return 35;
+                return 25;
+            });
+        
+        // Add labels
+        node.append('text')
+            .attr('class', 'node-label')
+            .attr('dy', d => d.id.startsWith('team-') ? -5 : 0)
+            .text(d => d.name);
+        
+        // Add capacity labels for teams
+        node.filter(d => d.id.startsWith('team-'))
+            .append('text')
+            .attr('class', 'capacity-label')
+            .attr('dy', 10)
+            .text(d => `${d.used}/${d.capacity} pts`);
+        
+        // Tooltip
+        const tooltip = d3.select('.tooltip');
+        
+        node.on('mouseover', (event, d) => {
+            let content = `<strong>${d.name}</strong><br>`;
+            if (d.id.startsWith('team-')) {
+                content += `Capacity: ${d.used}/${d.capacity} pts<br>`;
+                content += `Utilization: ${Math.round(d.used/d.capacity*100)}%`;
+            } else if (d.type === 'epic') {
+                content += `Points: ${d.points}<br>`;
+                content += `Team: ${teams.find(t => t.id === d.team).name}`;
+            } else {
+                content += `Points: ${d.points}<br>`;
+                content += `Team: ${teams.find(t => t.id === d.team).name}`;
+            }
+            
+            tooltip.html(content)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 10) + 'px')
+                .style('opacity', 1);
+        })
+        .on('mouseout', () => {
+            tooltip.style('opacity', 0);
+        });
+        
+        // Update positions on tick
+        simulation.on('tick', () => {
+            // Update cluster boundaries
+            clusterBoundaries
+                .attr('cx', d => d.fx || d.x)
+                .attr('cy', d => d.fy || d.y);
+            
+            // Update cluster labels
+            clusterLabels
+                .attr('x', d => d.fx || d.x)
+                .attr('y', d => d.fy || d.y);
+            
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+        
+        // Drag functions
+        function drag(simulation) {
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                // Only allow dragging non-team nodes
+                if (!d.id.startsWith('team-')) {
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+            }
+            
+            function dragged(event, d) {
+                if (!d.id.startsWith('team-')) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                if (!d.id.startsWith('team-')) {
+                    d.fx = null;
+                    d.fy = null;
+                }
+            }
+            
+            return d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended);
+        }
+        
+        // Update cluster spacing
+        function updateClusterSpacing(spacing) {
+            currentClusterSpacing = spacing;
+            
+            // Update team positions
+            teams.forEach((team, i) => {
+                const clusterPos = getClusterPosition(i);
+                const teamNode = data.nodes.find(n => n.id === team.id);
+                teamNode.fx = clusterPos.x;
+                teamNode.fy = clusterPos.y;
+            });
+            
+            // Update cluster boundaries
+            clusterBoundaries
+                .transition()
+                .duration(750)
+                .attr('r', spacing * 0.35);
+            
+            clusterLabels
+                .transition()
+                .duration(750)
+                .attr('dy', -spacing * 0.35 - 10);
+            
+            // Restart simulation
+            simulation.alpha(0.5).restart();
+            
+            // Update display
+            document.getElementById('cluster-spacing-value').textContent = spacing;
+        }
+        
+        // Fit all clusters in view
+        function fitAllClusters() {
+            const padding = 100;
+            const bounds = {
+                minX: Math.min(...teams.map(t => getClusterPosition(teams.indexOf(t)).x)) - currentClusterSpacing/2,
+                maxX: Math.max(...teams.map(t => getClusterPosition(teams.indexOf(t)).x)) + currentClusterSpacing/2,
+                minY: Math.min(...teams.map(t => getClusterPosition(teams.indexOf(t)).y)) - currentClusterSpacing/2,
+                maxY: Math.max(...teams.map(t => getClusterPosition(teams.indexOf(t)).y)) + currentClusterSpacing/2
+            };
+            
+            const dx = bounds.maxX - bounds.minX;
+            const dy = bounds.maxY - bounds.minY;
+            const x = (bounds.minX + bounds.maxX) / 2;
+            const y = (bounds.minY + bounds.maxY) / 2;
+            const scale = Math.min(0.9 / Math.max(dx / width, dy / height), 2);
+            
+            svg.transition()
+                .duration(750)
+                .call(
+                    zoom.transform,
+                    d3.zoomIdentity
+                        .translate(width / 2, height / 2)
+                        .scale(scale)
+                        .translate(-x, -y)
+                );
+            
+            // Update active button
+            document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+            event.target?.classList.add('active');
+        }
+        
+        // Focus on specific team
+        function focusTeam(teamName) {
+            const team = teams.find(t => t.name === teamName);
+            if (!team) return;
+            
+            const teamNode = data.nodes.find(n => n.id === team.id);
+            const scale = 1.5;
+            
+            svg.transition()
+                .duration(750)
+                .call(
+                    zoom.transform,
+                    d3.zoomIdentity
+                        .translate(width / 2, height / 2)
+                        .scale(scale)
+                        .translate(-teamNode.fx, -teamNode.fy)
+                );
+            
+            // Update active button
+            document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+            event.target?.classList.add('active');
+        }
+        
+        // Reset view
+        function resetView() {
+            updateClusterSpacing(400);
+            fitAllClusters();
+            document.getElementById('cluster-spacing-slider').value = 400;
+        }
+        
+        // Set cluster spacing from preset
+        function setClusterSpacing(value) {
+            document.getElementById('cluster-spacing-slider').value = value;
+            updateClusterSpacing(value);
+            
+            // Update active preset button
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+            event.target?.classList.add('active');
+        }
+        
+        // Slider event listener
+        document.getElementById('cluster-spacing-slider').addEventListener('input', function(e) {
+            updateClusterSpacing(parseInt(e.target.value));
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT') return;
+            
+            const slider = document.getElementById('cluster-spacing-slider');
+            const current = parseInt(slider.value);
+            
+            if (e.key === '+' || e.key === '=') {
+                const newValue = Math.min(current + 50, 1000);
+                slider.value = newValue;
+                updateClusterSpacing(newValue);
+            } else if (e.key === '-' || e.key === '_') {
+                const newValue = Math.max(current - 50, 100);
+                slider.value = newValue;
+                updateClusterSpacing(newValue);
+            } else if (e.key === '0') {
+                slider.value = 400;
+                updateClusterSpacing(400);
+            } else if (e.key === 'f' || e.key === 'F') {
+                fitAllClusters();
+            }
+        });
+        
+        // Initial fit
+        setTimeout(() => fitAllClusters(), 100);
+    </script>
+</body>
+</html>

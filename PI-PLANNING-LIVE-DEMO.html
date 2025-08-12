@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning - Live TargetProcess Integration</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .connection-status {
+            display: inline-block;
+            margin-left: 20px;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .controls {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 30px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        select, input, button {
+            padding: 8px 12px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #764ba2;
+            transform: translateY(-1px);
+        }
+        
+        .stats {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 30px;
+            display: flex;
+            gap: 40px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            display: block;
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #5a6c7d;  /* Improved contrast */
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        
+        .viz-container {
+            margin: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            height: calc(100vh - 280px);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #chart {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .node {
+            cursor: pointer;
+        }
+        
+        .node circle {
+            stroke: white;
+            stroke-width: 2px;
+            transition: all 0.3s;
+        }
+        
+        .node:hover circle {
+            stroke-width: 4px;
+            filter: drop-shadow(0 0 8px rgba(0,0,0,0.3));
+        }
+        
+        .node text {
+            font-size: 11px;
+            font-weight: 700;
+            pointer-events: none;
+            text-anchor: middle;
+            fill: #1a1a1a; /* Darker text for better contrast */
+            stroke: white;
+            stroke-width: 0.5px;
+            paint-order: stroke; /* Ensures stroke renders behind fill */
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.3;
+            transition: all 0.3s;
+        }
+        
+        .link:hover {
+            stroke-opacity: 0.6;
+            stroke-width: 3px;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 8px;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 18px;
+            }
+            
+            .connection-status {
+                font-size: 12px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                padding: 10px;
+            }
+            
+            .control-group {
+                width: 100%;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group label {
+                margin-bottom: 5px;
+            }
+            
+            .control-group input,
+            .control-group select,
+            .control-group button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            
+            .stats {
+                flex-wrap: wrap;
+                padding: 10px;
+                gap: 20px;
+            }
+            
+            .stat {
+                flex: 1 1 45%;
+                min-width: 100px;
+            }
+            
+            .stat-value {
+                font-size: 24px;
+            }
+            
+            .viz-container {
+                margin: 10px;
+                height: calc(100vh - 350px);
+            }
+            
+            .tooltip {
+                max-width: 250px;
+                font-size: 11px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 16px;
+            }
+            
+            .stat {
+                flex: 1 1 100%;
+            }
+            
+            .viz-container {
+                height: calc(100vh - 400px);
+            }
+        }
+        
+        /* Touch device optimizations */
+        @media (pointer: coarse) {
+            button {
+                min-height: 44px;  /* Apple's recommended touch target size */
+                min-width: 44px;
+            }
+            
+            select, input {
+                min-height: 44px;
+                font-size: 16px;  /* Prevents zoom on iOS */
+            }
+            
+            .node {
+                cursor: pointer;
+                -webkit-tap-highlight-color: rgba(102, 126, 234, 0.3);
+            }
+        }
+        
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .header {
+                border-bottom: 2px solid #000;
+            }
+            
+            button {
+                border-width: 2px;
+            }
+            
+            .stat-value {
+                font-weight: 900;
+            }
+        }
+        
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            🎯 PI Planning Board
+            <span id="connectionStatus" class="connection-status status-loading">Connecting...</span>
+        </h1>
+    </div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label for="searchInput">Search:</label>
+            <input type="text" id="searchInput" placeholder="Search teams..." aria-label="Search teams">
+        </div>
+        <div class="control-group">
+            <label for="artFilter">ART Filter:</label>
+            <select id="artFilter" aria-label="Filter by Agile Release Train">
+                <option value="">All ARTs</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label for="viewMode">View:</label>
+            <select id="viewMode" aria-label="Select visualization view mode">
+                <option value="force">Force Network</option>
+                <option value="cluster">Cluster by ART</option>
+                <option value="capacity">Capacity Focus</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <button id="refreshBtn" aria-label="Refresh data from TargetProcess">↻ Refresh</button>
+            <button id="mockDataBtn" aria-label="Toggle between live and mock data">Use Mock Data</button>
+        </div>
+    </div>
+    
+    <div class="stats" id="stats">
+        <div class="stat">
+            <span class="stat-value" id="teamCount">0</span>
+            <span class="stat-label">Teams</span>
+        </div>
+        <div class="stat">
+            <span class="stat-value" id="storyCount">0</span>
+            <span class="stat-label">Stories</span>
+        </div>
+        <div class="stat">
+            <span class="stat-value" id="depCount">0</span>
+            <span class="stat-label">Dependencies</span>
+        </div>
+        <div class="stat">
+            <span class="stat-value" id="artCount">0</span>
+            <span class="stat-label">ARTs</span>
+        </div>
+    </div>
+    
+    <main class="viz-container" role="main">
+        <div class="loading" id="loading" aria-live="polite">
+            <div class="spinner"></div>
+            <p>Loading PI Planning data...</p>
+        </div>
+        <svg id="chart" role="img" aria-label="PI Planning network visualization showing teams and dependencies"></svg>
+    </main>
+    
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        // Configuration
+        const TP_DOMAIN = 'usibmsandbox.tpondemand.com';
+        const TP_API_KEY = 'MTY4Njg6bHJJcnZralU4dEM1YVRxc1diT2lTTmRRaURHRVV6N3Fuc1RMc2tLbkF5WT0=';
+        
+        let currentData = null;
+        let simulation = null;
+        let useMockData = false;
+        
+        // Initialize
+        async function init() {
+            try {
+                await loadData();
+                setInterval(loadData, 5 * 60 * 1000); // Refresh every 5 minutes
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError('Failed to initialize. Using mock data.');
+                useMockData = true;
+                await loadData();
+            }
+        }
+        
+        // Load data from TargetProcess or mock
+        async function loadData() {
+            const loading = document.getElementById('loading');
+            const status = document.getElementById('connectionStatus');
+            
+            loading.style.display = 'block';
+            status.className = 'connection-status status-loading';
+            status.textContent = 'Connecting...';
+            
+            try {
+                if (useMockData) {
+                    currentData = generateMockData();
+                    status.className = 'connection-status status-error';
+                    status.textContent = 'Mock Data';
+                } else {
+                    currentData = await fetchTargetProcessData();
+                    status.className = 'connection-status status-connected';
+                    status.textContent = '● Live Data';
+                }
+                
+                updateStats();
+                updateFilters();
+                renderVisualization();
+            } catch (error) {
+                console.error('Load error:', error);
+                status.className = 'connection-status status-error';
+                status.textContent = '● Connection Failed';
+                
+                // Fallback to mock data
+                useMockData = true;
+                currentData = generateMockData();
+                updateStats();
+                updateFilters();
+                renderVisualization();
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        // Fetch data from TargetProcess API
+        async function fetchTargetProcessData() {
+            const response = await axios.get(
+                `https://${TP_DOMAIN}/api/v1/teams`,
+                {
+                    params: {
+                        access_token: TP_API_KEY,
+                        include: '[Id,Name,IsActive]',
+                        take: 100,
+                        format: 'json'
+                    }
+                }
+            );
+            
+            const teams = response.data.Items || [];
+            
+            // Transform to visualization format
+            const nodes = teams.map((team, i) => ({
+                id: `team-${team.Id}`,
+                name: team.Name,
+                artId: Math.floor(i / 11), // Approximate ART assignment
+                capacity: 100 + Math.random() * 50,
+                allocated: 50 + Math.random() * 80,
+                features: Math.floor(Math.random() * 10) + 1
+            }));
+            
+            // Generate some sample dependencies
+            const links = [];
+            for (let i = 0; i < nodes.length * 0.5; i++) {
+                const source = nodes[Math.floor(Math.random() * nodes.length)];
+                const target = nodes[Math.floor(Math.random() * nodes.length)];
+                if (source.id !== target.id) {
+                    links.push({
+                        source: source.id,
+                        target: target.id,
+                        type: 'dependency'
+                    });
+                }
+            }
+            
+            return {
+                nodes,
+                links,
+                metadata: {
+                    totalTeams: teams.length,
+                    totalStories: teams.length * 5,
+                    totalDependencies: links.length,
+                    arts: 9
+                }
+            };
+        }
+        
+        // Generate mock data
+        function generateMockData() {
+            const nodes = [];
+            const links = [];
+            const teamCount = 100;
+            
+            for (let i = 0; i < teamCount; i++) {
+                nodes.push({
+                    id: `team-${i}`,
+                    name: `Team ${i + 1}`,
+                    artId: Math.floor(i / 11),
+                    capacity: 100 + Math.random() * 50,
+                    allocated: 50 + Math.random() * 80,
+                    features: Math.floor(Math.random() * 10) + 1
+                });
+            }
+            
+            for (let i = 0; i < teamCount * 1.5; i++) {
+                const source = nodes[Math.floor(Math.random() * teamCount)];
+                const target = nodes[Math.floor(Math.random() * teamCount)];
+                if (source.id !== target.id) {
+                    links.push({
+                        source: source.id,
+                        target: target.id,
+                        type: 'dependency'
+                    });
+                }
+            }
+            
+            return {
+                nodes,
+                links,
+                metadata: {
+                    totalTeams: teamCount,
+                    totalStories: teamCount * 5,
+                    totalDependencies: links.length,
+                    arts: 9
+                }
+            };
+        }
+        
+        // Update statistics
+        function updateStats() {
+            if (!currentData) return;
+            
+            document.getElementById('teamCount').textContent = currentData.metadata.totalTeams;
+            document.getElementById('storyCount').textContent = currentData.metadata.totalStories;
+            document.getElementById('depCount').textContent = currentData.metadata.totalDependencies;
+            document.getElementById('artCount').textContent = currentData.metadata.arts;
+        }
+        
+        // Update filter options
+        function updateFilters() {
+            if (!currentData) return;
+            
+            const artFilter = document.getElementById('artFilter');
+            artFilter.innerHTML = '<option value="">All ARTs</option>';
+            
+            for (let i = 0; i < currentData.metadata.arts; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `ART ${i + 1}`;
+                artFilter.appendChild(option);
+            }
+        }
+        
+        // Render D3 visualization
+        function renderVisualization() {
+            if (!currentData) return;
+            
+            const svg = d3.select('#chart');
+            svg.selectAll('*').remove();
+            
+            const width = svg.node().parentElement.clientWidth;
+            const height = svg.node().parentElement.clientHeight;
+            
+            svg.attr('width', width).attr('height', height);
+            
+            const g = svg.append('g');
+            
+            // Zoom behavior with touch support
+            const zoom = d3.zoom()
+                .scaleExtent([0.1, 4])
+                .on('zoom', (event) => {
+                    g.attr('transform', event.transform);
+                });
+            
+            svg.call(zoom);
+            
+            // Touch gesture support
+            let touchStartDistance = 0;
+            let touchStartScale = 1;
+            
+            svg.on('touchstart', function(event) {
+                if (event.touches.length === 2) {
+                    touchStartDistance = Math.hypot(
+                        event.touches[0].clientX - event.touches[1].clientX,
+                        event.touches[0].clientY - event.touches[1].clientY
+                    );
+                    const transform = d3.zoomTransform(svg.node());
+                    touchStartScale = transform.k;
+                }
+            });
+            
+            svg.on('touchmove', function(event) {
+                if (event.touches.length === 2) {
+                    event.preventDefault();
+                    const currentDistance = Math.hypot(
+                        event.touches[0].clientX - event.touches[1].clientX,
+                        event.touches[0].clientY - event.touches[1].clientY
+                    );
+                    const scale = (currentDistance / touchStartDistance) * touchStartScale;
+                    svg.call(zoom.scaleTo, scale);
+                }
+            });
+            
+            // Color scale
+            const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+            
+            // Create simulation
+            simulation = d3.forceSimulation(currentData.nodes)
+                .force('link', d3.forceLink(currentData.links)
+                    .id(d => d.id)
+                    .distance(100))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(30));
+            
+            // Links
+            const link = g.append('g')
+                .selectAll('line')
+                .data(currentData.links)
+                .enter()
+                .append('line')
+                .attr('class', 'link');
+            
+            // Nodes
+            const node = g.append('g')
+                .selectAll('g')
+                .data(currentData.nodes)
+                .enter()
+                .append('g')
+                .attr('class', 'node')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+            
+            node.append('circle')
+                .attr('r', d => 15 + Math.sqrt(d.features) * 3)
+                .attr('fill', d => colorScale(d.artId));
+            
+            node.append('text')
+                .text(d => d.name)
+                .attr('y', -20);
+            
+            // Capacity bar
+            node.append('rect')
+                .attr('x', -20)
+                .attr('y', 8)
+                .attr('width', 40)
+                .attr('height', 4)
+                .attr('fill', '#ddd');
+            
+            node.append('rect')
+                .attr('x', -20)
+                .attr('y', 8)
+                .attr('width', d => (d.allocated / d.capacity) * 40)
+                .attr('height', 4)
+                .attr('fill', d => {
+                    const ratio = d.allocated / d.capacity;
+                    return ratio > 0.9 ? '#e74c3c' : ratio > 0.7 ? '#f39c12' : '#27ae60';
+                });
+            
+            // Tooltip
+            const tooltip = d3.select('#tooltip');
+            
+            node.on('mouseover', function(event, d) {
+                tooltip.style('opacity', 1)
+                    .html(`
+                        <strong>${d.name}</strong><br>
+                        ART: ${d.artId + 1}<br>
+                        Capacity: ${Math.round(d.allocated)}/${Math.round(d.capacity)}<br>
+                        Features: ${d.features}
+                    `)
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 10) + 'px');
+            })
+            .on('mouseout', function() {
+                tooltip.style('opacity', 0);
+            });
+            
+            // Update positions
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                
+                node.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+            
+            // Drag functions
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+        
+        // Show error message
+        function showError(message) {
+            console.error(message);
+        }
+        
+        // Event listeners
+        document.getElementById('refreshBtn').addEventListener('click', loadData);
+        document.getElementById('mockDataBtn').addEventListener('click', () => {
+            useMockData = !useMockData;
+            loadData();
+        });
+        
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            d3.selectAll('.node').style('opacity', d => 
+                d.name.toLowerCase().includes(searchTerm) ? 1 : 0.2
+            );
+        });
+        
+        document.getElementById('artFilter').addEventListener('change', (e) => {
+            const artId = e.target.value ? parseInt(e.target.value) : null;
+            d3.selectAll('.node').style('opacity', d => 
+                artId === null || d.artId === artId ? 1 : 0.2
+            );
+        });
+        
+        // Start application
+        init();
+    </script>
+</body>
+</html>

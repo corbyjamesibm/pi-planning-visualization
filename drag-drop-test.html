@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drag & Drop PI Planning Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .title {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #6B7280;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .demo-area {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-bar {
+            background: #F8FAFC;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .status-item {
+            display: inline-block;
+            margin-right: 24px;
+            font-size: 14px;
+            color: #64748B;
+        }
+
+        .status-value {
+            font-weight: 600;
+            color: #1E293B;
+        }
+
+        .workspace {
+            flex: 1;
+            position: relative;
+            background: #FAFAFA;
+            border: 2px dashed #D1D5DB;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 40px;
+        }
+
+        .team-zone {
+            flex: 1;
+            min-height: 200px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .team-zone.drop-valid {
+            border-color: #10B981;
+            background: #F0FDF4;
+            transform: scale(1.02);
+        }
+
+        .team-zone.drop-invalid {
+            border-color: #EF4444;
+            background: #FEF2F2;
+            border-style: dashed;
+        }
+
+        .team-zone.drop-warning {
+            border-color: #F59E0B;
+            background: #FFFBEB;
+        }
+
+        .team-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1F2937;
+            margin-bottom: 12px;
+        }
+
+        .team-capacity {
+            background: #F3F4F6;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #6B7280;
+            margin-bottom: 16px;
+        }
+
+        .team-capacity.near-limit {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .team-capacity.at-limit {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .draggable-item {
+            background: linear-gradient(135deg, #3B82F6, #1E40AF);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: grab;
+            user-select: none;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .draggable-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .draggable-item:active {
+            cursor: grabbing;
+        }
+
+        .draggable-item.dragging {
+            opacity: 0.3;
+            transform: scale(0.95);
+        }
+
+        .draggable-item.epic {
+            background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+            box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+        }
+
+        .draggable-item.epic:hover {
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        }
+
+        .drag-ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0.8;
+            transform: rotate(-5deg);
+            transform-origin: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+        }
+
+        .instructions {
+            background: #EFF6FF;
+            border: 1px solid #DBEAFE;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #1E40AF;
+        }
+
+        .instructions h3 {
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+
+        .instructions ul {
+            margin-left: 16px;
+        }
+
+        .instructions li {
+            margin-bottom: 4px;
+        }
+
+        .feature-count {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #EF4444;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🎯 PI Planning - Drag & Drop Interface</h1>
+            <p class="subtitle">
+                Drag features and epics between teams. Watch capacity limits and validation feedback in real-time.
+            </p>
+        </div>
+
+        <div class="demo-area">
+            <div class="status-bar">
+                <span class="status-item">
+                    <span class="status-value" id="dragStatus">Ready</span> - Drag Status
+                </span>
+                <span class="status-item">
+                    <span class="status-value" id="moveCount">0</span> moves completed
+                </span>
+                <span class="status-item">
+                    <span class="status-value" id="validationStatus">All Valid</span> - Validation
+                </span>
+            </div>
+
+            <div class="workspace" id="workspace">
+                <div class="team-zone" data-team-id="frontend" data-capacity-current="8" data-capacity-max="10">
+                    <h3 class="team-title">Frontend Team</h3>
+                    <div class="team-capacity">Capacity: <span id="frontend-capacity">8/10</span> (80%)</div>
+                    <div class="feature-count">3</div>
+                    
+                    <div class="draggable-item" draggable="true" data-id="feature-1" data-type="feature">
+                        🔐 User Authentication (5 pts)
+                    </div>
+                    <div class="draggable-item epic" draggable="true" data-id="epic-1" data-type="epic">
+                        👥 User Management Epic (13 pts)
+                    </div>
+                    <div class="draggable-item" draggable="true" data-id="feature-2" data-type="feature">
+                        📱 Responsive UI (3 pts)
+                    </div>
+                </div>
+
+                <div class="team-zone" data-team-id="backend" data-capacity-current="6" data-capacity-max="10">
+                    <h3 class="team-title">Backend Team</h3>
+                    <div class="team-capacity">Capacity: <span id="backend-capacity">6/10</span> (60%)</div>
+                    <div class="feature-count">2</div>
+                    
+                    <div class="draggable-item" draggable="true" data-id="feature-3" data-type="feature">
+                        🔗 API Integration (8 pts)
+                    </div>
+                    <div class="draggable-item" draggable="true" data-id="feature-4" data-type="feature">
+                        🗄️ Database Schema (5 pts)
+                    </div>
+                </div>
+
+                <div class="team-zone" data-team-id="qa" data-capacity-current="10" data-capacity-max="10">
+                    <h3 class="team-title">QA Team</h3>
+                    <div class="team-capacity at-limit">Capacity: <span id="qa-capacity">10/10</span> (100%)</div>
+                    <div class="feature-count">2</div>
+                    
+                    <div class="draggable-item" draggable="true" data-id="feature-5" data-type="feature">
+                        🧪 Automated Testing (8 pts)
+                    </div>
+                    <div class="draggable-item" draggable="true" data-id="feature-6" data-type="feature">
+                        📊 Performance Tests (5 pts)
+                    </div>
+                </div>
+            </div>
+
+            <div class="instructions">
+                <h3>🚀 How to Use:</h3>
+                <ul>
+                    <li><strong>Drag:</strong> Click and drag any feature or epic to move it between teams</li>
+                    <li><strong>Capacity:</strong> Green = available space, Yellow = near limit, Red = at capacity</li>
+                    <li><strong>Validation:</strong> Drop zones show visual feedback (green = valid, red = invalid)</li>
+                    <li><strong>Cancel:</strong> Press ESC while dragging to cancel the operation</li>
+                    <li><strong>Features:</strong> Blue items represent individual features</li>
+                    <li><strong>Epics:</strong> Purple items represent epics containing multiple features</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Drag and Drop State
+        let dragState = {
+            isDragging: false,
+            draggedElement: null,
+            draggedData: null,
+            ghostElement: null,
+            originalParent: null,
+            validDropTargets: [],
+            moveCount: 0
+        };
+
+        // Initialize drag and drop
+        function initializeDragDrop() {
+            console.log('🎯 Initializing Drag & Drop System');
+            
+            // Add event listeners to all draggable items
+            const draggableItems = document.querySelectorAll('.draggable-item');
+            draggableItems.forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+            });
+
+            // Add event listeners to all team zones
+            const teamZones = document.querySelectorAll('.team-zone');
+            teamZones.forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('dragenter', handleDragEnter);
+                zone.addEventListener('dragleave', handleDragLeave);
+                zone.addEventListener('drop', handleDrop);
+            });
+
+            // Add keyboard support
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && dragState.isDragging) {
+                    cancelDrag();
+                }
+            });
+
+            updateStatus('Ready', 'All systems operational');
+        }
+
+        // Handle drag start
+        function handleDragStart(e) {
+            const element = e.target;
+            dragState.isDragging = true;
+            dragState.draggedElement = element;
+            dragState.originalParent = element.parentElement;
+            dragState.draggedData = {
+                id: element.dataset.id,
+                type: element.dataset.type,
+                text: element.textContent.trim()
+            };
+
+            console.log('🟢 Drag Started:', dragState.draggedData);
+
+            // Add dragging class
+            element.classList.add('dragging');
+
+            // Create ghost element
+            createGhostElement(element);
+
+            // Update UI
+            updateStatus('Dragging', `Moving ${dragState.draggedData.type}: ${dragState.draggedData.id}`);
+            updateValidDropTargets();
+
+            // Set drag data
+            e.dataTransfer.setData('text/plain', JSON.stringify(dragState.draggedData));
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        // Handle drag end
+        function handleDragEnd(e) {
+            console.log('🔴 Drag Ended');
+            cleanupDrag();
+        }
+
+        // Handle drag over
+        function handleDragOver(e) {
+            e.preventDefault();
+            const teamZone = e.currentTarget;
+            const canAccept = validateDropTarget(teamZone);
+            
+            e.dataTransfer.dropEffect = canAccept ? 'move' : 'none';
+        }
+
+        // Handle drag enter
+        function handleDragEnter(e) {
+            e.preventDefault();
+            const teamZone = e.currentTarget;
+            const validation = validateDropTarget(teamZone);
+            
+            if (validation) {
+                teamZone.classList.add('drop-valid');
+                updateStatus('Over Valid Target', `Can drop on ${teamZone.querySelector('.team-title').textContent}`);
+            } else {
+                teamZone.classList.add('drop-invalid');
+                updateStatus('Over Invalid Target', `Cannot drop on ${teamZone.querySelector('.team-title').textContent} - at capacity`);
+            }
+        }
+
+        // Handle drag leave
+        function handleDragLeave(e) {
+            const teamZone = e.currentTarget;
+            
+            // Only remove classes if we're actually leaving the zone
+            if (!teamZone.contains(e.relatedTarget)) {
+                teamZone.classList.remove('drop-valid', 'drop-invalid', 'drop-warning');
+            }
+        }
+
+        // Handle drop
+        function handleDrop(e) {
+            e.preventDefault();
+            const teamZone = e.currentTarget;
+            const validation = validateDropTarget(teamZone);
+            
+            if (!validation || !dragState.draggedElement) {
+                console.log('❌ Invalid drop');
+                cleanupDrag();
+                return;
+            }
+
+            const targetTeamId = teamZone.dataset.teamId;
+            console.log('✅ Valid Drop:', {
+                item: dragState.draggedData,
+                targetTeam: targetTeamId
+            });
+
+            // Execute the move
+            executeMove(teamZone);
+        }
+
+        // Create ghost element
+        function createGhostElement(originalElement) {
+            const ghost = originalElement.cloneNode(true);
+            ghost.classList.add('drag-ghost');
+            ghost.style.position = 'fixed';
+            ghost.style.pointerEvents = 'none';
+            ghost.style.zIndex = '1000';
+            ghost.style.opacity = '0.8';
+            
+            document.body.appendChild(ghost);
+            dragState.ghostElement = ghost;
+
+            // Update ghost position on mouse move
+            document.addEventListener('mousemove', updateGhostPosition);
+        }
+
+        // Update ghost element position
+        function updateGhostPosition(e) {
+            if (dragState.ghostElement) {
+                dragState.ghostElement.style.left = (e.clientX + 10) + 'px';
+                dragState.ghostElement.style.top = (e.clientY - 10) + 'px';
+            }
+        }
+
+        // Validate drop target
+        function validateDropTarget(teamZone) {
+            const currentCapacity = parseInt(teamZone.dataset.capacityCurrent);
+            const maxCapacity = parseInt(teamZone.dataset.capacityMax);
+            const originalTeam = dragState.originalParent;
+            
+            // Can't drop on same team
+            if (originalTeam === teamZone) {
+                return false;
+            }
+
+            // Check capacity (assuming each item adds 1 point)
+            return currentCapacity < maxCapacity;
+        }
+
+        // Update valid drop targets visual feedback
+        function updateValidDropTargets() {
+            const teamZones = document.querySelectorAll('.team-zone');
+            dragState.validDropTargets = [];
+            
+            teamZones.forEach(zone => {
+                const isValid = validateDropTarget(zone);
+                if (isValid) {
+                    dragState.validDropTargets.push(zone.dataset.teamId);
+                    zone.classList.add('pulse');
+                } else {
+                    zone.style.opacity = '0.7';
+                }
+            });
+        }
+
+        // Execute the move
+        function executeMove(targetTeamZone) {
+            if (!dragState.draggedElement) return;
+
+            // Simulate API call delay
+            updateStatus('Processing', 'Updating TargetProcess...');
+
+            setTimeout(() => {
+                // Move the element
+                targetTeamZone.appendChild(dragState.draggedElement);
+                
+                // Update capacities
+                updateTeamCapacities();
+                
+                // Update move counter
+                dragState.moveCount++;
+                document.getElementById('moveCount').textContent = dragState.moveCount;
+                
+                // Success feedback
+                updateStatus('Move Complete', `Successfully moved ${dragState.draggedData.type}`);
+                
+                // Cleanup
+                cleanupDrag();
+                
+                console.log('🎉 Move completed successfully!');
+            }, 1000);
+        }
+
+        // Update team capacities
+        function updateTeamCapacities() {
+            const teamZones = document.querySelectorAll('.team-zone');
+            
+            teamZones.forEach(zone => {
+                const items = zone.querySelectorAll('.draggable-item');
+                const itemCount = items.length;
+                const maxCapacity = parseInt(zone.dataset.capacityMax);
+                
+                // Update data attribute
+                zone.dataset.capacityCurrent = itemCount;
+                
+                // Update display
+                const capacitySpan = zone.querySelector('[id$="-capacity"]');
+                if (capacitySpan) {
+                    capacitySpan.textContent = `${itemCount}/${maxCapacity}`;
+                }
+                
+                // Update feature count badge
+                const countBadge = zone.querySelector('.feature-count');
+                if (countBadge) {
+                    countBadge.textContent = itemCount;
+                }
+                
+                // Update capacity styling
+                const capacityDiv = zone.querySelector('.team-capacity');
+                capacityDiv.classList.remove('near-limit', 'at-limit');
+                
+                const percentage = (itemCount / maxCapacity) * 100;
+                if (percentage >= 100) {
+                    capacityDiv.classList.add('at-limit');
+                } else if (percentage >= 80) {
+                    capacityDiv.classList.add('near-limit');
+                }
+            });
+        }
+
+        // Cancel drag operation
+        function cancelDrag() {
+            console.log('🟡 Drag Cancelled');
+            updateStatus('Cancelled', 'Drag operation cancelled');
+            cleanupDrag();
+        }
+
+        // Cleanup drag state
+        function cleanupDrag() {
+            if (dragState.draggedElement) {
+                dragState.draggedElement.classList.remove('dragging');
+            }
+            
+            if (dragState.ghostElement) {
+                document.body.removeChild(dragState.ghostElement);
+                document.removeEventListener('mousemove', updateGhostPosition);
+            }
+            
+            // Remove visual feedback from all zones
+            const teamZones = document.querySelectorAll('.team-zone');
+            teamZones.forEach(zone => {
+                zone.classList.remove('drop-valid', 'drop-invalid', 'drop-warning', 'pulse');
+                zone.style.opacity = '';
+            });
+            
+            // Reset drag state
+            dragState = {
+                isDragging: false,
+                draggedElement: null,
+                draggedData: null,
+                ghostElement: null,
+                originalParent: null,
+                validDropTargets: [],
+                moveCount: dragState.moveCount // Preserve move count
+            };
+            
+            updateStatus('Ready', 'Ready for next operation');
+        }
+
+        // Update status display
+        function updateStatus(status, description) {
+            document.getElementById('dragStatus').textContent = status;
+            
+            const validationElement = document.getElementById('validationStatus');
+            if (status.includes('Invalid') || status.includes('Cannot')) {
+                validationElement.textContent = 'Invalid Target';
+                validationElement.style.color = '#EF4444';
+            } else if (status.includes('Valid') || status.includes('Can drop')) {
+                validationElement.textContent = 'Valid Target';
+                validationElement.style.color = '#10B981';
+            } else {
+                validationElement.textContent = 'All Valid';
+                validationElement.style.color = '#6B7280';
+            }
+            
+            console.log(`📊 Status: ${status} - ${description}`);
+        }
+
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 PI Planning Drag & Drop Demo Loaded');
+            initializeDragDrop();
+            updateTeamCapacities();
+        });
+
+        // Add some demo interactions
+        setTimeout(() => {
+            console.log('💡 Tip: Try dragging a feature from Frontend to Backend!');
+        }, 2000);
+    </script>
+</body>
+</html>

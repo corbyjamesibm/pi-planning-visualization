@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning Visualization Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .navigation-header {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 15px 30px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo h1 {
+            font-size: 24px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            gap: 5px;
+            background: #f0f0f0;
+            padding: 5px;
+            border-radius: 10px;
+        }
+        
+        .nav-tab {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .nav-tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+        
+        .nav-tab.active {
+            background: #667eea;
+            color: white;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .nav-tab .icon {
+            font-size: 16px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .control-btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #667eea;
+            transition: all 0.2s;
+        }
+        
+        .control-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .control-btn.objectives-btn {
+            background: #667eea;
+            color: white;
+        }
+        
+        .control-btn.objectives-btn.active {
+            background: #764ba2;
+        }
+        
+        .content-area {
+            flex: 1;
+            position: relative;
+            background: white;
+            margin: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .view-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: none;
+        }
+        
+        .view-frame.active {
+            display: block;
+        }
+        
+        .objectives-panel {
+            position: fixed;
+            right: -320px;
+            top: 80px;
+            width: 300px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: -4px 4px 20px rgba(0,0,0,0.15);
+            padding: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+            transition: right 0.3s ease;
+            z-index: 999;
+        }
+        
+        .objectives-panel.open {
+            right: 20px;
+        }
+        
+        .objectives-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .objectives-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+        }
+        
+        .close-btn:hover {
+            color: #333;
+            background: #f0f0f0;
+        }
+        
+        .team-objectives {
+            margin-bottom: 20px;
+        }
+        
+        .team-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 10px;
+            padding: 5px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .objective-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 6px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+        
+        .objective-item:hover {
+            transform: translateX(3px);
+        }
+        
+        .objective-item.committed {
+            background: #d4f4dd;
+            border-left: 4px solid #27ae60;
+        }
+        
+        .objective-item.uncommitted {
+            background: #fff3cd;
+            border-left: 4px solid #f39c12;
+        }
+        
+        .objective-item.stretch {
+            background: #e3f2fd;
+            border-left: 4px solid #3498db;
+        }
+        
+        .objective-item.rejected {
+            background: #ffebee;
+            border-left: 4px solid #e74c3c;
+            opacity: 0.7;
+        }
+        
+        .business-value {
+            font-weight: bold;
+            color: #667eea;
+            background: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+        
+        .metrics-summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .metrics-summary h4 {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        
+        .metric-label {
+            color: #666;
+        }
+        
+        .metric-value {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .loading-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+        
+        .loading-spinner.active {
+            display: block;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .welcome-screen h2 {
+            font-size: 36px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .welcome-screen p {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 40px;
+            max-width: 600px;
+        }
+        
+        .view-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+        
+        .view-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .view-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+        
+        .view-card h3 {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .view-card p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="navigation-header">
+        <div class="logo">
+            <h1>🚀 PI Planning Visualization Dashboard</h1>
+        </div>
+        
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-view="welcome">
+                <span class="icon">🏠</span>
+                <span>Home</span>
+            </button>
+            <button class="nav-tab" data-view="timeline">
+                <span class="icon">📈</span>
+                <span>Timeline View</span>
+            </button>
+            <button class="nav-tab" data-view="event">
+                <span class="icon">📅</span>
+                <span>2-Day Event</span>
+            </button>
+            <button class="nav-tab" data-view="sprint">
+                <span class="icon">📋</span>
+                <span>Sprint Organization</span>
+            </button>
+        </div>
+        
+        <div class="controls">
+            <button class="control-btn objectives-btn" id="toggleObjectives">
+                <span>📊 PI Objectives</span>
+            </button>
+        </div>
+    </div>
+    
+    <div class="content-area">
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner"></div>
+        </div>
+        
+        <div class="welcome-screen" id="welcomeView">
+            <h2>Welcome to PI Planning Visualization</h2>
+            <p>Select a view from the navigation above or click on a card below to explore different perspectives of your PI Planning session.</p>
+            
+            <div class="view-cards">
+                <div class="view-card" onclick="navigateToView('timeline')">
+                    <h3>📈 Timeline View</h3>
+                    <p>Explore the 90-day timeline with animated progression through sprints</p>
+                </div>
+                <div class="view-card" onclick="navigateToView('event')">
+                    <h3>📅 2-Day Event</h3>
+                    <p>Experience the hour-by-hour PI Planning event activities</p>
+                </div>
+                <div class="view-card" onclick="navigateToView('sprint')">
+                    <h3>📋 Sprint Organization</h3>
+                    <p>View stories organized by teams and sprints with capacity tracking</p>
+                </div>
+            </div>
+        </div>
+        
+        <iframe class="view-frame" id="timelineFrame" src="PI-PLANNING-TIMELINE-DEMO.html"></iframe>
+        <iframe class="view-frame" id="eventFrame" src="PI-PLANNING-2DAY-EVENT.html"></iframe>
+        <iframe class="view-frame" id="sprintFrame" src="PI-PLANNING-SPRINT-VIEW-FIXED.html"></iframe>
+    </div>
+    
+    <div class="objectives-panel" id="objectivesPanel">
+        <div class="objectives-header">
+            <div class="objectives-title">Team PI Objectives</div>
+            <button class="close-btn" onclick="toggleObjectivesPanel()">✕</button>
+        </div>
+        
+        <div id="objectivesContent">
+            <div class="team-objectives">
+                <div class="team-name">Platform Core</div>
+                <div class="objective-item committed">
+                    <span>Implement OAuth 2.0</span>
+                    <span class="business-value">BV: 10</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>Database Migration</span>
+                    <span class="business-value">BV: 8</span>
+                </div>
+                <div class="objective-item uncommitted">
+                    <span>Performance Tuning</span>
+                    <span class="business-value">BV: 5</span>
+                </div>
+            </div>
+            
+            <div class="team-objectives">
+                <div class="team-name">Mobile Experience</div>
+                <div class="objective-item committed">
+                    <span>iOS App Redesign</span>
+                    <span class="business-value">BV: 10</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>Android Parity</span>
+                    <span class="business-value">BV: 8</span>
+                </div>
+                <div class="objective-item stretch">
+                    <span>Offline Mode</span>
+                    <span class="business-value">BV: 6</span>
+                </div>
+            </div>
+            
+            <div class="team-objectives">
+                <div class="team-name">Data Services</div>
+                <div class="objective-item committed">
+                    <span>Real-time Analytics</span>
+                    <span class="business-value">BV: 10</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>Data Lake Integration</span>
+                    <span class="business-value">BV: 7</span>
+                </div>
+                <div class="objective-item stretch">
+                    <span>ML Pipeline</span>
+                    <span class="business-value">BV: 5</span>
+                </div>
+            </div>
+            
+            <div class="team-objectives">
+                <div class="team-name">Customer Portal</div>
+                <div class="objective-item committed">
+                    <span>Self-Service Portal</span>
+                    <span class="business-value">BV: 10</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>Notification System</span>
+                    <span class="business-value">BV: 6</span>
+                </div>
+                <div class="objective-item uncommitted">
+                    <span>Advanced Search</span>
+                    <span class="business-value">BV: 4</span>
+                </div>
+            </div>
+            
+            <div class="team-objectives">
+                <div class="team-name">API Gateway</div>
+                <div class="objective-item committed">
+                    <span>GraphQL Implementation</span>
+                    <span class="business-value">BV: 9</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>Rate Limiting</span>
+                    <span class="business-value">BV: 7</span>
+                </div>
+                <div class="objective-item rejected">
+                    <span>API Versioning</span>
+                    <span class="business-value">BV: 4</span>
+                </div>
+            </div>
+            
+            <div class="team-objectives">
+                <div class="team-name">DevOps</div>
+                <div class="objective-item committed">
+                    <span>CI/CD Pipeline</span>
+                    <span class="business-value">BV: 10</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>Kubernetes Migration</span>
+                    <span class="business-value">BV: 8</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>Monitoring Stack</span>
+                    <span class="business-value">BV: 6</span>
+                </div>
+            </div>
+            
+            <div class="team-objectives">
+                <div class="team-name">Security</div>
+                <div class="objective-item committed">
+                    <span>Security Audit</span>
+                    <span class="business-value">BV: 10</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>PCI Compliance</span>
+                    <span class="business-value">BV: 10</span>
+                </div>
+                <div class="objective-item uncommitted">
+                    <span>Penetration Testing</span>
+                    <span class="business-value">BV: 5</span>
+                </div>
+            </div>
+            
+            <div class="team-objectives">
+                <div class="team-name">Analytics</div>
+                <div class="objective-item committed">
+                    <span>Executive Dashboard</span>
+                    <span class="business-value">BV: 9</span>
+                </div>
+                <div class="objective-item stretch">
+                    <span>Predictive Models</span>
+                    <span class="business-value">BV: 7</span>
+                </div>
+                <div class="objective-item committed">
+                    <span>Data Quality Framework</span>
+                    <span class="business-value">BV: 6</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="metrics-summary">
+            <h4>Summary</h4>
+            <div class="metric-row">
+                <span class="metric-label">Total Objectives:</span>
+                <span class="metric-value">24</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Committed:</span>
+                <span class="metric-value">18</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Stretch:</span>
+                <span class="metric-value">3</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Uncommitted:</span>
+                <span class="metric-value">2</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-label">Total Business Value:</span>
+                <span class="metric-value">186</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentView = 'welcome';
+        let objectivesPanelOpen = false;
+        
+        // Navigation function
+        function navigateToView(viewName) {
+            // Update active tab
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.dataset.view === viewName) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            // Hide welcome screen if needed
+            document.getElementById('welcomeView').style.display = 
+                viewName === 'welcome' ? 'flex' : 'none';
+            
+            // Update iframe visibility
+            document.querySelectorAll('.view-frame').forEach(frame => {
+                frame.classList.remove('active');
+            });
+            
+            if (viewName !== 'welcome') {
+                // Show loading spinner
+                const spinner = document.getElementById('loadingSpinner');
+                spinner.classList.add('active');
+                
+                // Show the appropriate iframe
+                const frameMap = {
+                    'timeline': 'timelineFrame',
+                    'event': 'eventFrame',
+                    'sprint': 'sprintFrame'
+                };
+                
+                const frame = document.getElementById(frameMap[viewName]);
+                if (frame) {
+                    frame.classList.add('active');
+                    
+                    // Hide spinner after a short delay
+                    setTimeout(() => {
+                        spinner.classList.remove('active');
+                    }, 500);
+                }
+            }
+            
+            currentView = viewName;
+        }
+        
+        // Toggle objectives panel
+        function toggleObjectivesPanel() {
+            const panel = document.getElementById('objectivesPanel');
+            const button = document.getElementById('toggleObjectives');
+            
+            objectivesPanelOpen = !objectivesPanelOpen;
+            
+            if (objectivesPanelOpen) {
+                panel.classList.add('open');
+                button.classList.add('active');
+            } else {
+                panel.classList.remove('open');
+                button.classList.remove('active');
+            }
+        }
+        
+        // Add event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Navigation tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    navigateToView(tab.dataset.view);
+                });
+            });
+            
+            // Objectives panel toggle
+            document.getElementById('toggleObjectives').addEventListener('click', toggleObjectivesPanel);
+            
+            // Close panel when clicking outside
+            document.addEventListener('click', (e) => {
+                const panel = document.getElementById('objectivesPanel');
+                const button = document.getElementById('toggleObjectives');
+                
+                if (objectivesPanelOpen && 
+                    !panel.contains(e.target) && 
+                    !button.contains(e.target)) {
+                    toggleObjectivesPanel();
+                }
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // ESC to close objectives panel
+                if (e.key === 'Escape' && objectivesPanelOpen) {
+                    toggleObjectivesPanel();
+                }
+                
+                // Number keys for quick navigation
+                if (e.key === '1') navigateToView('timeline');
+                if (e.key === '2') navigateToView('event');
+                if (e.key === '3') navigateToView('sprint');
+                if (e.key === '0') navigateToView('welcome');
+            });
+        });
+    </script>
+</body>
+</html>

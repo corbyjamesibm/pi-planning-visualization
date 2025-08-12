@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning Event - 2 Day Timeline</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .event-badge {
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .current-activity {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .time-display {
+            font-size: 16px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        #visualization {
+            width: 100%;
+            height: calc(100vh - 280px);
+            background: white;
+            position: relative;
+        }
+        
+        .controls-panel {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 20px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            z-index: 1000;
+        }
+        
+        .timeline-container {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            position: relative;
+        }
+        
+        .timeline-slider {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(to right, #667eea 0%, #667eea var(--progress, 0%), #ddd var(--progress, 0%), #ddd 100%);
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #667eea;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            transition: all 0.2s;
+        }
+        
+        .timeline-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: #667eea;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+        
+        .activity-markers {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            right: 0;
+            height: 40px;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px;
+        }
+        
+        .activity-marker {
+            position: relative;
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+            white-space: nowrap;
+        }
+        
+        .activity-marker::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 15px;
+            background: #667eea;
+        }
+        
+        .day-divider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background: #ff6b6b;
+            opacity: 0.5;
+        }
+        
+        .playback-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 15px 0;
+        }
+        
+        .control-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: #667eea;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .control-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        .control-btn.primary {
+            background: #667eea;
+            color: white;
+            min-width: 100px;
+        }
+        
+        .speed-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-left: auto;
+            padding-left: 20px;
+            border-left: 1px solid #e0e0e0;
+        }
+        
+        .speed-btn {
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .speed-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .metrics-bar {
+            display: flex;
+            gap: 30px;
+            padding: 10px 0;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .metric {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        /* Node styles */
+        .node {
+            cursor: pointer;
+        }
+        
+        .node.feature {
+            fill: #764ba2;
+        }
+        
+        .node.story {
+            fill: #667eea;
+        }
+        
+        .node.team {
+            fill: #27ae60;
+        }
+        
+        @keyframes nodeAppear {
+            from {
+                opacity: 0;
+                transform: scale(0);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .node.new {
+            animation: nodeAppear 0.5s ease-out;
+        }
+        
+        .activity-indicator {
+            position: absolute;
+            top: 70px;
+            right: 30px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+        
+        .activity-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .activity-description {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .spacing-control {
+            position: absolute;
+            top: 15px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 PI Planning Event - Q1 2025</h1>
+        <div class="event-badge">2-Day Event</div>
+        <div class="spacing-control">
+            <label style="font-size: 14px; color: #666;">Spacing:</label>
+            <input type="range" id="spacingSlider" min="100" max="500" value="250" 
+                   style="width: 150px; cursor: pointer;">
+            <span id="spacingValue" style="font-size: 14px; color: #667eea; font-weight: 600; min-width: 40px;">250</span>
+        </div>
+    </div>
+    
+    <div id="visualization">
+        <div class="activity-indicator" id="activityIndicator">
+            <div class="activity-title" id="activityTitle">Welcome & Context</div>
+            <div class="activity-description" id="activityDescription">Business context and vision</div>
+        </div>
+    </div>
+    
+    <div class="controls-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div>
+                <div class="current-activity" id="currentActivity">Day 1 - Morning</div>
+                <div class="time-display" id="timeDisplay">8:00 AM - Welcome & Business Context</div>
+            </div>
+            <div class="metrics-bar">
+                <div class="metric">
+                    <span class="metric-label">Features:</span>
+                    <span class="metric-value" id="featuresCount">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">User Stories:</span>
+                    <span class="metric-value" id="storiesCount">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Story Points:</span>
+                    <span class="metric-value" id="storyPoints">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Dependencies:</span>
+                    <span class="metric-value" id="dependencies">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Teams:</span>
+                    <span class="metric-value" id="teamsCount">8</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="timeline-container">
+            <input type="range" class="timeline-slider" id="timelineSlider" min="0" max="23" value="0">
+            <div class="day-divider"></div>
+            <div class="activity-markers" id="activityMarkers"></div>
+        </div>
+        
+        <div class="playback-controls">
+            <button class="control-btn" id="btn-start" title="Jump to Start">⏮️ Start</button>
+            <button class="control-btn" id="btn-prev" title="Previous Hour">⏪ Prev</button>
+            <button class="control-btn primary" id="btn-play" title="Play/Pause">▶️ Play</button>
+            <button class="control-btn" id="btn-next" title="Next Hour">⏩ Next</button>
+            <button class="control-btn" id="btn-end" title="Jump to End">⏭️ End</button>
+            
+            <div class="speed-controls">
+                <label style="margin-right: 10px;">Speed:</label>
+                <button class="speed-btn" data-speed="0.5">0.5x</button>
+                <button class="speed-btn active" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="2">2x</button>
+                <button class="speed-btn" data-speed="5">5x</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // PI Planning Event Schedule (2 days)
+        const eventSchedule = [
+            // Day 1
+            { hour: 0, time: '8:00 AM', day: 1, activity: 'Welcome & Business Context', description: 'Business leaders share vision and context' },
+            { hour: 1, time: '9:00 AM', day: 1, activity: 'Product Vision', description: 'Product Management presents features' },
+            { hour: 2, time: '10:00 AM', day: 1, activity: 'Architecture Vision', description: 'System architects present technical vision' },
+            { hour: 3, time: '11:00 AM', day: 1, activity: 'Team Breakouts Begin', description: 'Teams start breaking features into stories' },
+            { hour: 4, time: '12:00 PM', day: 1, activity: 'Working Lunch', description: 'Teams continue planning during lunch' },
+            { hour: 5, time: '1:00 PM', day: 1, activity: 'Team Planning', description: 'Teams create user stories from features' },
+            { hour: 6, time: '2:00 PM', day: 1, activity: 'Story Estimation', description: 'Teams estimate story points' },
+            { hour: 7, time: '3:00 PM', day: 1, activity: 'Dependency Identification', description: 'Teams identify cross-team dependencies' },
+            { hour: 8, time: '4:00 PM', day: 1, activity: 'Draft Plan Review', description: 'Teams review draft plans internally' },
+            { hour: 9, time: '5:00 PM', day: 1, activity: 'Management Review', description: 'Leadership reviews progress' },
+            { hour: 10, time: '6:00 PM', day: 1, activity: 'Day 1 Wrap-up', description: 'Summary and preparation for Day 2' },
+            
+            // Day 2
+            { hour: 12, time: '8:00 AM', day: 2, activity: 'Day 2 Kickoff', description: 'Recap and objectives for Day 2' },
+            { hour: 13, time: '9:00 AM', day: 2, activity: 'Dependency Resolution', description: 'Teams negotiate dependencies' },
+            { hour: 14, time: '10:00 AM', day: 2, activity: 'Risk Identification', description: 'Identify and plan for risks' },
+            { hour: 15, time: '11:00 AM', day: 2, activity: 'Final Planning', description: 'Finalize stories and commitments' },
+            { hour: 16, time: '12:00 PM', day: 2, activity: 'Team Presentations Prep', description: 'Teams prepare presentations' },
+            { hour: 17, time: '1:00 PM', day: 2, activity: 'Team Presentations', description: 'Each team presents their PI plan' },
+            { hour: 18, time: '2:00 PM', day: 2, activity: 'Team Presentations Cont.', description: 'Teams continue presenting' },
+            { hour: 19, time: '3:00 PM', day: 2, activity: 'Risk ROAM', description: 'Review risks: Resolved, Owned, Accepted, Mitigated' },
+            { hour: 20, time: '4:00 PM', day: 2, activity: 'Confidence Vote', description: 'Teams vote on confidence in the plan' },
+            { hour: 21, time: '5:00 PM', day: 2, activity: 'PI Objectives Finalized', description: 'Final PI objectives and commitments' },
+            { hour: 22, time: '6:00 PM', day: 2, activity: 'Retrospective & Close', description: 'Event retrospective and celebration' },
+            { hour: 23, time: '6:30 PM', day: 2, activity: 'Event Complete', description: 'PI Planning complete!' }
+        ];
+        
+        // Teams
+        const teams = [
+            { id: 'team-1', name: 'Platform Core', x: 200, y: 200, capacity: 80 },
+            { id: 'team-2', name: 'Mobile Experience', x: 600, y: 200, capacity: 65 },
+            { id: 'team-3', name: 'Data Services', x: 1000, y: 200, capacity: 70 },
+            { id: 'team-4', name: 'Customer Portal', x: 400, y: 400, capacity: 75 },
+            { id: 'team-5', name: 'API Gateway', x: 800, y: 400, capacity: 60 },
+            { id: 'team-6', name: 'DevOps', x: 200, y: 600, capacity: 55 },
+            { id: 'team-7', name: 'Security', x: 600, y: 600, capacity: 50 },
+            { id: 'team-8', name: 'Analytics', x: 1000, y: 600, capacity: 70 }
+        ];
+        
+        // Generate event timeline data
+        function generateEventData() {
+            const snapshots = [];
+            let features = [];
+            let stories = [];
+            let dependencies = [];
+            let storyId = 1;
+            let featureId = 1;
+            
+            console.log('Generating event data...');
+            
+            eventSchedule.forEach((slot, index) => {
+                const currentFeatures = [...features];
+                const currentStories = [...stories];
+                const currentDependencies = [...dependencies];
+                const changes = { added: [], moved: [], completed: [] };
+                
+                // Day 1 - Features presented and broken down
+                if (slot.hour === 1) {
+                    // Product vision - features are presented
+                    const newFeatures = [
+                        { id: `feat-${featureId++}`, name: 'User Authentication', type: 'feature', points: 40 },
+                        { id: `feat-${featureId++}`, name: 'Payment Processing', type: 'feature', points: 55 },
+                        { id: `feat-${featureId++}`, name: 'Real-time Dashboard', type: 'feature', points: 35 },
+                        { id: `feat-${featureId++}`, name: 'Mobile App Sync', type: 'feature', points: 45 },
+                        { id: `feat-${featureId++}`, name: 'Data Export API', type: 'feature', points: 30 },
+                        { id: `feat-${featureId++}`, name: 'Security Audit', type: 'feature', points: 25 },
+                        { id: `feat-${featureId++}`, name: 'Performance Optimization', type: 'feature', points: 40 },
+                        { id: `feat-${featureId++}`, name: 'Customer Portal v2', type: 'feature', points: 50 }
+                    ];
+                    features.push(...newFeatures);
+                    changes.added = newFeatures.map(f => f.id);
+                }
+                
+                // Teams start breaking down features into stories
+                if (slot.hour >= 3 && slot.hour <= 8) {
+                    const storyBatch = Math.floor((slot.hour - 3) * 2);
+                    if (storyBatch < features.length) {
+                        const feature = features[storyBatch];
+                        const teamIndex = storyBatch % teams.length;
+                        const team = teams[teamIndex];
+                        
+                        // Create 3-5 stories per feature
+                        const numStories = 3 + Math.floor(Math.random() * 3);
+                        for (let i = 0; i < numStories; i++) {
+                            const story = {
+                                id: `story-${storyId++}`,
+                                name: `${feature.name} - Story ${i + 1}`,
+                                type: 'story',
+                                featureId: feature.id,
+                                teamId: team.id,
+                                points: Math.floor(feature.points / numStories),
+                                status: 'planned',
+                                x: team.x + (Math.random() - 0.5) * 100,
+                                y: team.y + (Math.random() - 0.5) * 100
+                            };
+                            stories.push(story);
+                            changes.added.push(story.id);
+                        }
+                    }
+                }
+                
+                // Dependency identification
+                if (slot.hour === 7 || slot.hour === 13) {
+                    // Add some cross-team dependencies
+                    const teamStories = stories.reduce((acc, story) => {
+                        if (!acc[story.teamId]) acc[story.teamId] = [];
+                        acc[story.teamId].push(story);
+                        return acc;
+                    }, {});
+                    
+                    const teamIds = Object.keys(teamStories);
+                    if (teamIds.length > 1) {
+                        for (let i = 0; i < 3; i++) {
+                            const fromTeam = teamIds[Math.floor(Math.random() * teamIds.length)];
+                            const toTeam = teamIds[Math.floor(Math.random() * teamIds.length)];
+                            if (fromTeam !== toTeam && teamStories[fromTeam].length > 0 && teamStories[toTeam].length > 0) {
+                                const fromStory = teamStories[fromTeam][0];
+                                const toStory = teamStories[toTeam][0];
+                                dependencies.push({
+                                    source: fromStory.id,
+                                    target: toStory.id,
+                                    type: 'dependency'
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                // Prepare nodes for visualization - always include teams
+                const nodes = [
+                    ...teams.map(t => ({ 
+                        ...t, 
+                        type: 'team',
+                        status: 'active'
+                    })),
+                    ...currentFeatures.map(f => ({
+                        ...f,
+                        type: 'feature',
+                        x: 600 + (Math.random() - 0.5) * 400,
+                        y: 100
+                    })),
+                    ...currentStories.map(s => ({
+                        ...s,
+                        type: 'story'
+                    }))
+                ];
+                
+                // Log for debugging
+                if (index === 0) {
+                    console.log('Initial snapshot nodes:', nodes);
+                }
+                
+                // Create links
+                const links = [
+                    ...currentStories.map(s => ({
+                        source: s.teamId,
+                        target: s.id,
+                        type: 'assignment'
+                    })),
+                    ...currentStories.map(s => ({
+                        source: s.featureId,
+                        target: s.id,
+                        type: 'breakdown'
+                    })),
+                    ...currentDependencies
+                ];
+                
+                snapshots.push({
+                    hour: slot.hour,
+                    time: slot.time,
+                    day: slot.day,
+                    activity: slot.activity,
+                    description: slot.description,
+                    nodes,
+                    links,
+                    changes,
+                    metrics: {
+                        features: currentFeatures.length,
+                        stories: currentStories.length,
+                        storyPoints: currentStories.reduce((sum, s) => sum + s.points, 0),
+                        dependencies: currentDependencies.length,
+                        teams: teams.length
+                    }
+                });
+            });
+            
+            return snapshots;
+        }
+        
+        // Initialize
+        const eventData = generateEventData();
+        let currentIndex = 0;
+        let isPlaying = false;
+        let playbackSpeed = 1.0;
+        let playInterval = null;
+        let currentSpacing = 250;
+        
+        const width = window.innerWidth;
+        const height = window.innerHeight - 280;
+        
+        // Create SVG
+        const svg = d3.select('#visualization')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        
+        const g = svg.append('g');
+        
+        // Add zoom
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        // Spacing control
+        const spacingSlider = document.getElementById('spacingSlider');
+        const spacingValue = document.getElementById('spacingValue');
+        
+        spacingSlider.addEventListener('input', (e) => {
+            currentSpacing = parseInt(e.target.value);
+            spacingValue.textContent = currentSpacing;
+            updateVisualization(eventData[currentIndex]);
+        });
+        
+        // Initialize activity markers
+        const activityMarkers = document.getElementById('activityMarkers');
+        const keyActivities = [
+            { hour: 0, label: 'Welcome' },
+            { hour: 1, label: 'Vision' },
+            { hour: 3, label: 'Breakouts' },
+            { hour: 7, label: 'Dependencies' },
+            { hour: 12, label: 'Day 2' },
+            { hour: 17, label: 'Present' },
+            { hour: 20, label: 'Vote' },
+            { hour: 23, label: 'Close' }
+        ];
+        
+        keyActivities.forEach(activity => {
+            const marker = document.createElement('div');
+            marker.className = 'activity-marker';
+            marker.textContent = activity.label;
+            marker.style.position = 'absolute';
+            marker.style.left = `${(activity.hour / 23) * 100}%`;
+            activityMarkers.appendChild(marker);
+        });
+        
+        // Update visualization
+        function updateVisualization(snapshot) {
+            console.log('Updating visualization with snapshot:', snapshot);
+            console.log('Number of nodes:', snapshot.nodes.length);
+            
+            // Clear previous
+            g.selectAll('*').remove();
+            
+            // Copy nodes for simulation
+            const simNodes = snapshot.nodes.map(d => ({...d}));
+            const simLinks = snapshot.links.map(d => ({...d}));
+            
+            // Force simulation
+            const simulation = d3.forceSimulation(simNodes)
+                .force('link', d3.forceLink(simLinks)
+                    .id(d => d.id)
+                    .distance(d => d.type === 'breakdown' ? currentSpacing * 0.5 : currentSpacing))
+                .force('charge', d3.forceManyBody()
+                    .strength(-currentSpacing * 1.5))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide()
+                    .radius(d => {
+                        if (d.type === 'team') return 40;
+                        if (d.type === 'feature') return 30;
+                        return 20;
+                    }))
+                .stop();
+            
+            // Run simulation
+            for (let i = 0; i < 100; ++i) simulation.tick();
+            
+            // Create links
+            const link = g.append('g')
+                .selectAll('line')
+                .data(simLinks)
+                .enter()
+                .append('line')
+                .attr('stroke', d => {
+                    if (d.type === 'dependency') return '#ff6b6b';
+                    if (d.type === 'breakdown') return '#764ba2';
+                    return '#999';
+                })
+                .attr('stroke-width', d => d.type === 'dependency' ? 3 : 2)
+                .attr('stroke-opacity', d => d.type === 'breakdown' ? 0.3 : 0.6)
+                .attr('stroke-dasharray', d => d.type === 'dependency' ? '5,5' : null);
+            
+            // Create nodes
+            const node = g.append('g')
+                .selectAll('g')
+                .data(simNodes)
+                .enter()
+                .append('g')
+                .attr('class', d => {
+                    let classes = `node ${d.type}`;
+                    if (snapshot.changes.added.includes(d.id)) classes += ' new';
+                    return classes;
+                })
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+            
+            // Add shapes based on type - simpler approach with circles
+            node.append('circle')
+                .attr('r', d => {
+                    if (d.type === 'team') return 30;
+                    if (d.type === 'feature') return 20;
+                    return 15; // stories
+                })
+                .attr('fill', d => {
+                    if (d.type === 'team') return '#27ae60';
+                    if (d.type === 'feature') return '#764ba2';
+                    if (d.type === 'story') return '#667eea';
+                    return '#999'; // default
+                })
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 3)
+                .attr('opacity', 0.9);
+            
+            // Add labels
+            node.append('text')
+                .text(d => d.name)
+                .attr('x', 0)
+                .attr('y', d => d.type === 'team' ? -35 : -30)
+                .attr('text-anchor', 'middle')
+                .style('font-size', d => d.type === 'story' ? '10px' : '12px')
+                .style('font-weight', d => d.type === 'team' ? 'bold' : 'normal')
+                .style('fill', '#333');
+            
+            // Add points for stories
+            node.filter(d => d.type === 'story').append('text')
+                .text(d => `${d.points} pts`)
+                .attr('x', 0)
+                .attr('y', 5)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '9px')
+                .style('fill', '#666');
+            
+            // Position nodes
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+            
+            // Update links
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            
+            // Drag functions
+            function dragstarted(event, d) {
+                d3.select(this).raise();
+            }
+            
+            function dragged(event, d) {
+                d.x = event.x;
+                d.y = event.y;
+                d3.select(this).attr('transform', `translate(${d.x},${d.y})`);
+                
+                link.filter(l => l.source.id === d.id)
+                    .attr('x1', d.x)
+                    .attr('y1', d.y);
+                link.filter(l => l.target.id === d.id)
+                    .attr('x2', d.x)
+                    .attr('y2', d.y);
+            }
+            
+            function dragended(event, d) {
+                // Nothing needed
+            }
+            
+            // Update UI
+            document.getElementById('currentActivity').textContent = `Day ${snapshot.day} - ${snapshot.time}`;
+            document.getElementById('timeDisplay').textContent = `${snapshot.time} - ${snapshot.activity}`;
+            document.getElementById('activityTitle').textContent = snapshot.activity;
+            document.getElementById('activityDescription').textContent = snapshot.description;
+            
+            document.getElementById('featuresCount').textContent = snapshot.metrics.features;
+            document.getElementById('storiesCount').textContent = snapshot.metrics.stories;
+            document.getElementById('storyPoints').textContent = snapshot.metrics.storyPoints;
+            document.getElementById('dependencies').textContent = snapshot.metrics.dependencies;
+            
+            // Update slider progress
+            const slider = document.getElementById('timelineSlider');
+            slider.style.setProperty('--progress', `${(currentIndex / 23) * 100}%`);
+        }
+        
+        // Playback controls
+        function play() {
+            if (isPlaying) return;
+            isPlaying = true;
+            document.getElementById('btn-play').innerHTML = '⏸ Pause';
+            
+            playInterval = setInterval(() => {
+                if (currentIndex < eventData.length - 1) {
+                    currentIndex++;
+                    document.getElementById('timelineSlider').value = currentIndex;
+                    updateVisualization(eventData[currentIndex]);
+                } else {
+                    pause();
+                }
+            }, 1000 / playbackSpeed);
+        }
+        
+        function pause() {
+            isPlaying = false;
+            document.getElementById('btn-play').innerHTML = '▶️ Play';
+            if (playInterval) {
+                clearInterval(playInterval);
+                playInterval = null;
+            }
+        }
+        
+        // Event listeners
+        document.getElementById('btn-play').addEventListener('click', () => {
+            if (isPlaying) {
+                pause();
+            } else {
+                play();
+            }
+        });
+        
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            pause();
+            if (currentIndex > 0) {
+                currentIndex--;
+                document.getElementById('timelineSlider').value = currentIndex;
+                updateVisualization(eventData[currentIndex]);
+            }
+        });
+        
+        document.getElementById('btn-next').addEventListener('click', () => {
+            pause();
+            if (currentIndex < eventData.length - 1) {
+                currentIndex++;
+                document.getElementById('timelineSlider').value = currentIndex;
+                updateVisualization(eventData[currentIndex]);
+            }
+        });
+        
+        document.getElementById('btn-start').addEventListener('click', () => {
+            pause();
+            currentIndex = 0;
+            document.getElementById('timelineSlider').value = currentIndex;
+            updateVisualization(eventData[currentIndex]);
+        });
+        
+        document.getElementById('btn-end').addEventListener('click', () => {
+            pause();
+            currentIndex = eventData.length - 1;
+            document.getElementById('timelineSlider').value = currentIndex;
+            updateVisualization(eventData[currentIndex]);
+        });
+        
+        document.getElementById('timelineSlider').addEventListener('input', (e) => {
+            pause();
+            currentIndex = parseInt(e.target.value);
+            updateVisualization(eventData[currentIndex]);
+        });
+        
+        // Speed controls
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                playbackSpeed = parseFloat(btn.dataset.speed);
+                if (isPlaying) {
+                    pause();
+                    play();
+                }
+            });
+        });
+        
+        // Initialize
+        console.log('Event data generated:', eventData.length, 'snapshots');
+        if (eventData && eventData.length > 0) {
+            console.log('First snapshot has', eventData[0].nodes.length, 'nodes');
+            updateVisualization(eventData[0]);
+        } else {
+            console.error('No event data generated!');
+        }
+    </script>
+</body>
+</html>

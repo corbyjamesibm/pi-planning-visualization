@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning Event - 2 Day Time-Lapse</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 12px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 22px;
+            color: #1e3c72;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .event-timer {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        
+        .day-indicator {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2a5298;
+        }
+        
+        .time-display {
+            font-size: 16px;
+            color: #666;
+        }
+        
+        .session-indicator {
+            font-size: 14px;
+            color: #fff;
+            background: #2a5298;
+            padding: 2px 10px;
+            border-radius: 12px;
+            margin-top: 4px;
+        }
+        
+        #visualization {
+            width: 100%;
+            height: calc(100vh - 240px);
+            background: white;
+            position: relative;
+        }
+        
+        .controls-panel {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 15px 30px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 180px;
+        }
+        
+        .timeline-container {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            position: relative;
+        }
+        
+        .timeline-slider {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(to right, 
+                #4CAF50 0%, #4CAF50 25%,     /* Day 1 Morning */
+                #8BC34A 25%, #8BC34A 50%,     /* Day 1 Afternoon */
+                #03A9F4 50%, #03A9F4 75%,     /* Day 2 Morning */
+                #00BCD4 75%, #00BCD4 100%);   /* Day 2 Afternoon */
+            border-radius: 4px;
+            outline: none;
+        }
+        
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #fff;
+            border: 3px solid #2a5298;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .timeline-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+        
+        .timeline-segment {
+            text-align: center;
+            flex: 1;
+            padding: 5px;
+            border-right: 1px solid #ddd;
+        }
+        
+        .timeline-segment:last-child {
+            border-right: none;
+        }
+        
+        .timeline-segment .day {
+            font-weight: bold;
+            color: #2a5298;
+        }
+        
+        .timeline-segment .session {
+            color: #666;
+            font-size: 11px;
+        }
+        
+        .playback-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 15px 0;
+        }
+        
+        .control-btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #2a5298;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .control-btn:hover {
+            background: #2a5298;
+            color: white;
+        }
+        
+        .control-btn.active {
+            background: #2a5298;
+            color: white;
+        }
+        
+        .speed-controls {
+            display: flex;
+            gap: 5px;
+            margin-left: 20px;
+            align-items: center;
+        }
+        
+        .speed-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: white;
+            border: 1px solid #2a5298;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .speed-btn.active {
+            background: #2a5298;
+            color: white;
+        }
+        
+        /* Node Styles */
+        .team-node {
+            fill: #e8f4f8;
+            stroke: #2a5298;
+            stroke-width: 3;
+        }
+        
+        .feature-node {
+            fill: #fff3cd;
+            stroke: #f39c12;
+            stroke-width: 2;
+        }
+        
+        .story-node {
+            fill: #d4edda;
+            stroke: #28a745;
+            stroke-width: 1.5;
+        }
+        
+        .story-node.new {
+            animation: storyAppear 0.5s ease-out;
+        }
+        
+        @keyframes storyAppear {
+            0% {
+                r: 0;
+                opacity: 0;
+            }
+            50% {
+                r: 15;
+                opacity: 0.5;
+            }
+            100% {
+                r: 10;
+                opacity: 1;
+            }
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.4;
+            stroke-width: 1.5;
+        }
+        
+        .link-feature {
+            stroke: #f39c12;
+            stroke-width: 2;
+        }
+        
+        .link-story {
+            stroke: #28a745;
+            stroke-width: 1;
+        }
+        
+        .link-dependency {
+            stroke: #dc3545;
+            stroke-dasharray: 5, 5;
+            stroke-width: 2;
+            marker-end: url(#arrowhead);
+        }
+        
+        .link-dependency.new {
+            animation: dependencyDraw 1s ease-out;
+        }
+        
+        @keyframes dependencyDraw {
+            0% {
+                stroke-dashoffset: 100;
+                opacity: 0;
+            }
+            100% {
+                stroke-dashoffset: 0;
+                opacity: 1;
+            }
+        }
+        
+        .node-label {
+            font-size: 11px;
+            fill: #333;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+        
+        .team-label {
+            font-size: 14px;
+            font-weight: bold;
+            fill: #2a5298;
+        }
+        
+        .feature-label {
+            font-size: 12px;
+            font-weight: 600;
+            fill: #f39c12;
+        }
+        
+        .story-label {
+            font-size: 10px;
+            fill: #28a745;
+        }
+        
+        /* Info Panels */
+        .activity-panel {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 250px;
+        }
+        
+        .activity-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2a5298;
+            margin-bottom: 10px;
+        }
+        
+        .activity-item {
+            font-size: 12px;
+            margin: 5px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .activity-item::before {
+            content: '•';
+            position: absolute;
+            left: 8px;
+            color: #28a745;
+        }
+        
+        .metrics-panel {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-width: 200px;
+        }
+        
+        .metric-item {
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        
+        .metric-value {
+            font-weight: bold;
+            color: #2a5298;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 200px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+        
+        /* Interactive styles */
+        .node-group {
+            cursor: grab;
+        }
+        
+        .node-group:active {
+            cursor: grabbing;
+        }
+        
+        .node {
+            transition: r 0.2s, fill 0.2s;
+        }
+        
+        .node:hover {
+            filter: brightness(1.1) drop-shadow(0 0 8px rgba(102, 126, 234, 0.5));
+        }
+        
+        .link {
+            transition: stroke-opacity 0.2s;
+        }
+        
+        /* Force layout helpers */
+        .physics-info {
+            position: absolute;
+            bottom: 200px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            color: #666;
+            max-width: 200px;
+        }
+        
+        .physics-info h5 {
+            margin: 0 0 5px 0;
+            color: #2a5298;
+            font-size: 12px;
+        }
+        
+        .physics-info ul {
+            margin: 0;
+            padding-left: 20px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 PI Planning Event - 2 Day Time-Lapse</h1>
+        <div class="event-timer">
+            <div class="day-indicator" id="day-indicator">Day 1</div>
+            <div class="time-display" id="time-display">8:00 AM</div>
+            <div class="session-indicator" id="session-indicator">Opening & Vision</div>
+        </div>
+    </div>
+    
+    <div id="visualization"></div>
+    
+    <div class="activity-panel">
+        <div class="activity-title">Current Activity</div>
+        <div id="activity-list">
+            <div class="activity-item">Teams receiving feature assignments</div>
+        </div>
+    </div>
+    
+    <div class="metrics-panel">
+        <h4>Planning Progress</h4>
+        <div class="metric-item">
+            <span>Features:</span>
+            <span class="metric-value" id="feature-count">0</span>
+        </div>
+        <div class="metric-item">
+            <span>User Stories:</span>
+            <span class="metric-value" id="story-count">0</span>
+        </div>
+        <div class="metric-item">
+            <span>Story Points:</span>
+            <span class="metric-value" id="points-total">0</span>
+        </div>
+        <div class="metric-item">
+            <span>Dependencies:</span>
+            <span class="metric-value" id="dependency-count">0</span>
+        </div>
+        <div class="metric-item">
+            <span>Teams Active:</span>
+            <span class="metric-value" id="teams-active">5</span>
+        </div>
+    </div>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e8f4f8; border-color: #2a5298;"></div>
+            <span>Team</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #fff3cd; border-color: #f39c12;"></div>
+            <span>Feature</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #d4edda; border-color: #28a745;"></div>
+            <span>User Story</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: none; border: 2px dashed #dc3545;"></div>
+            <span>Dependency</span>
+        </div>
+    </div>
+    
+    <div class="physics-info">
+        <h5>Interactions</h5>
+        <ul>
+            <li><strong>Drag</strong> to move items</li>
+            <li><strong>Hover</strong> to highlight</li>
+            <li><strong>Double-click</strong> to unpin</li>
+            <li><strong>Scroll</strong> to zoom</li>
+            <li><strong>Drag canvas</strong> to pan</li>
+        </ul>
+    </div>
+    
+    <div class="controls-panel">
+        <div class="timeline-container">
+            <input type="range" 
+                   id="timeline-slider" 
+                   class="timeline-slider"
+                   min="0" 
+                   max="31" 
+                   value="0" 
+                   step="1">
+            <div class="timeline-labels">
+                <div class="timeline-segment">
+                    <div class="day">Day 1 Morning</div>
+                    <div class="session">8am-12pm</div>
+                    <div class="session">Business Context</div>
+                    <div class="session">Feature Assignment</div>
+                    <div class="session">Team Breakouts Begin</div>
+                </div>
+                <div class="timeline-segment">
+                    <div class="day">Day 1 Afternoon</div>
+                    <div class="session">1pm-5pm</div>
+                    <div class="session">Story Creation</div>
+                    <div class="session">Estimation</div>
+                    <div class="session">Draft Plan Review</div>
+                </div>
+                <div class="timeline-segment">
+                    <div class="day">Day 2 Morning</div>
+                    <div class="session">8am-12pm</div>
+                    <div class="session">Dependency Identification</div>
+                    <div class="session">Risk Assessment</div>
+                    <div class="session">Plan Adjustments</div>
+                </div>
+                <div class="timeline-segment">
+                    <div class="day">Day 2 Afternoon</div>
+                    <div class="session">1pm-5pm</div>
+                    <div class="session">Final Plans</div>
+                    <div class="session">Team Presentations</div>
+                    <div class="session">Confidence Vote</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="playback-controls">
+            <button class="control-btn" id="btn-start" title="Start">⏮️</button>
+            <button class="control-btn" id="btn-prev" title="Previous Hour">⏪</button>
+            <button class="control-btn" id="btn-play" title="Play/Pause">▶️ Play</button>
+            <button class="control-btn" id="btn-next" title="Next Hour">⏩</button>
+            <button class="control-btn" id="btn-end" title="End">⏭️</button>
+            
+            <div class="speed-controls">
+                <label>Speed:</label>
+                <button class="speed-btn" data-speed="0.5">0.5x</button>
+                <button class="speed-btn active" data-speed="1">1x</button>
+                <button class="speed-btn" data-speed="2">2x</button>
+                <button class="speed-btn" data-speed="5">5x</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Generate PI Planning Event Timeline (32 half-hour increments over 2 days)
+        function generatePlanningTimeline() {
+            const timeline = [];
+            const teams = [
+                { id: 'team-1', name: 'Platform Services', x: 200, y: 300, capacity: 40 },
+                { id: 'team-2', name: 'Digital Delivery', x: 500, y: 300, capacity: 35 },
+                { id: 'team-3', name: 'Data Analytics', x: 800, y: 300, capacity: 30 },
+                { id: 'team-4', name: 'Customer Experience', x: 350, y: 550, capacity: 35 },
+                { id: 'team-5', name: 'Infrastructure', x: 650, y: 550, capacity: 40 }
+            ];
+            
+            // Features to be assigned
+            const features = [
+                { id: 'f1', name: 'API Gateway', team: 'team-1', points: 21 },
+                { id: 'f2', name: 'User Portal', team: 'team-2', points: 34 },
+                { id: 'f3', name: 'Analytics Engine', team: 'team-3', points: 26 },
+                { id: 'f4', name: 'Mobile App', team: 'team-4', points: 31 },
+                { id: 'f5', name: 'Cloud Migration', team: 'team-5', points: 38 },
+                { id: 'f6', name: 'Security Layer', team: 'team-1', points: 18 },
+                { id: 'f7', name: 'Payment System', team: 'team-2', points: 29 }
+            ];
+            
+            let currentNodes = [...teams];
+            let currentLinks = [];
+            let storyCounter = 1;
+            let totalPoints = 0;
+            let dependencies = [];
+            
+            // Day 1 Morning (0-7): Opening, Vision, Feature Assignment & Initial Story Creation
+            for (let hour = 0; hour <= 7; hour++) {
+                const timeSlot = hour;
+                const activities = [];
+                
+                if (hour === 0) {
+                    activities.push("PI Planning kickoff");
+                    activities.push("Business context & product vision");
+                } else if (hour === 1) {
+                    activities.push("Architecture vision & technical constraints");
+                    activities.push("Teams prepare for feature assignments");
+                } else if (hour === 2) {
+                    // Assign ALL features at once (typical PI planning)
+                    activities.push("Product Management presents all features");
+                    for (const feature of features) {
+                        const team = teams.find(t => t.id === feature.team);
+                        const featureNode = {
+                            id: feature.id,
+                            name: feature.name,
+                            type: 'feature',
+                            team: feature.team,
+                            points: feature.points,
+                            x: team.x + (Math.random() - 0.5) * 120,
+                            y: team.y - 100
+                        };
+                        currentNodes.push(featureNode);
+                        currentLinks.push({
+                            source: feature.team,
+                            target: feature.id,
+                            type: 'feature'
+                        });
+                        totalPoints += feature.points;
+                    }
+                    activities.push("All teams receive their feature assignments");
+                } else if (hour === 3) {
+                    activities.push("Teams review and clarify feature requirements");
+                    activities.push("Initial capacity assessment");
+                } else if (hour >= 4 && hour <= 7) {
+                    // Teams create user stories for their features
+                    const teamIndex = (hour - 4) % teams.length;
+                    const team = teams[teamIndex];
+                    const teamFeatures = features.filter(f => f.team === team.id);
+                    
+                    if (teamFeatures.length > 0) {
+                        // Each team works on breaking down their features
+                        const featureToBreakdown = teamFeatures[Math.floor((hour - 4) / teams.length)];
+                        if (featureToBreakdown) {
+                            const existingStories = currentNodes.filter(n => n.type === 'story' && n.feature === featureToBreakdown.id);
+                            
+                            if (existingStories.length === 0) {
+                                // Create initial stories for this feature
+                                const numStories = 3 + Math.floor(Math.random() * 3);
+                                const storyPoints = [];
+                                let remainingPoints = featureToBreakdown.points;
+                                
+                                // Distribute points more realistically
+                                for (let i = 0; i < numStories - 1; i++) {
+                                    const points = Math.min(8, Math.max(1, Math.floor(remainingPoints / (numStories - i))));
+                                    storyPoints.push(points);
+                                    remainingPoints -= points;
+                                }
+                                storyPoints.push(remainingPoints);
+                                
+                                for (let s = 0; s < numStories; s++) {
+                                    const story = {
+                                        id: `story-${storyCounter}`,
+                                        name: `US-${storyCounter}: ${featureToBreakdown.name.substring(0, 10)} Story ${s + 1}`,
+                                        type: 'story',
+                                        feature: featureToBreakdown.id,
+                                        team: team.id,
+                                        points: storyPoints[s],
+                                        x: team.x + (Math.random() - 0.5) * 150,
+                                        y: team.y + (Math.random() - 0.5) * 100
+                                    };
+                                    currentNodes.push(story);
+                                    currentLinks.push({
+                                        source: featureToBreakdown.id,
+                                        target: story.id,
+                                        type: 'story'
+                                    });
+                                    storyCounter++;
+                                }
+                                activities.push(`${team.name} creates ${numStories} stories for ${featureToBreakdown.name}`);
+                                activities.push(`Story points: ${storyPoints.join(', ')}`);
+                            }
+                        }
+                    }
+                }
+                
+                timeline.push({
+                    hour: timeSlot,
+                    day: 1,
+                    time: `${8 + Math.floor(hour / 2)}:${hour % 2 === 0 ? '00' : '30'} ${hour < 4 ? 'AM' : 'PM'}`,
+                    session: hour < 8 ? 'Vision & Features' : 'Story Breakdown',
+                    nodes: JSON.parse(JSON.stringify(currentNodes)),
+                    links: JSON.parse(JSON.stringify(currentLinks)),
+                    activities: activities,
+                    metrics: {
+                        features: currentNodes.filter(n => n.type === 'feature').length,
+                        stories: currentNodes.filter(n => n.type === 'story').length,
+                        points: totalPoints,
+                        dependencies: dependencies.length
+                    }
+                });
+            }
+            
+            // Day 1 Afternoon (8-15): Story Breakdown Continues
+            for (let hour = 8; hour <= 15; hour++) {
+                const timeSlot = hour;
+                const activities = [];
+                
+                // Continue story breakdown
+                const teamIndex = (hour - 8) % 5;
+                const team = teams[teamIndex];
+                const teamFeatures = currentNodes.filter(n => n.type === 'feature' && n.team === team.id);
+                
+                if (teamFeatures.length > 0 && Math.random() > 0.3) {
+                    const feature = teamFeatures[Math.floor(Math.random() * teamFeatures.length)];
+                    const existingStories = currentNodes.filter(n => n.type === 'story' && n.feature === feature.id);
+                    
+                    if (existingStories.length < 8) {
+                        const story = {
+                            id: `story-${storyCounter++}`,
+                            name: `US-${storyCounter}`,
+                            type: 'story',
+                            feature: feature.id,
+                            team: team.id,
+                            points: 3 + Math.floor(Math.random() * 5),
+                            x: team.x + (Math.random() - 0.5) * 150,
+                            y: team.y + (Math.random() - 0.5) * 100
+                        };
+                        currentNodes.push(story);
+                        currentLinks.push({
+                            source: feature.id,
+                            target: story.id,
+                            type: 'story'
+                        });
+                        activities.push(`${team.name} adds story ${story.name} to ${feature.name}`);
+                    }
+                }
+                
+                // Start identifying dependencies (late afternoon)
+                if (hour >= 12 && Math.random() > 0.5) {
+                    const stories = currentNodes.filter(n => n.type === 'story');
+                    if (stories.length > 2) {
+                        const story1 = stories[Math.floor(Math.random() * stories.length)];
+                        const story2 = stories[Math.floor(Math.random() * stories.length)];
+                        
+                        if (story1.team !== story2.team && story1.id !== story2.id) {
+                            const depId = `dep-${dependencies.length + 1}`;
+                            const dep = {
+                                id: depId,
+                                source: story1.id,
+                                target: story2.id,
+                                type: 'dependency'
+                            };
+                            
+                            if (!currentLinks.find(l => l.source === dep.source && l.target === dep.target)) {
+                                currentLinks.push(dep);
+                                dependencies.push(dep);
+                                
+                                const team1 = teams.find(t => t.id === story1.team);
+                                const team2 = teams.find(t => t.id === story2.team);
+                                activities.push(`Dependency: ${team1.name} → ${team2.name}`);
+                            }
+                        }
+                    }
+                }
+                
+                timeline.push({
+                    hour: timeSlot,
+                    day: 1,
+                    time: `${1 + Math.floor((hour - 8) / 2)}:${hour % 2 === 0 ? '00' : '30'} PM`,
+                    session: 'Story Breakdown',
+                    nodes: JSON.parse(JSON.stringify(currentNodes)),
+                    links: JSON.parse(JSON.stringify(currentLinks)),
+                    activities: activities,
+                    metrics: {
+                        features: currentNodes.filter(n => n.type === 'feature').length,
+                        stories: currentNodes.filter(n => n.type === 'story').length,
+                        points: totalPoints,
+                        dependencies: dependencies.length
+                    }
+                });
+            }
+            
+            // Day 2 Morning (16-23): Dependency Mapping
+            for (let hour = 16; hour <= 23; hour++) {
+                const timeSlot = hour;
+                const activities = [];
+                
+                // Heavy dependency identification
+                const stories = currentNodes.filter(n => n.type === 'story');
+                
+                if (stories.length > 2 && Math.random() > 0.3) {
+                    const story1 = stories[Math.floor(Math.random() * stories.length)];
+                    const story2 = stories[Math.floor(Math.random() * stories.length)];
+                    
+                    if (story1.team !== story2.team && story1.id !== story2.id) {
+                        const depId = `dep-${dependencies.length + 1}`;
+                        const dep = {
+                            id: depId,
+                            source: story1.id,
+                            target: story2.id,
+                            type: 'dependency'
+                        };
+                        
+                        if (!currentLinks.find(l => l.source === dep.source && l.target === dep.target)) {
+                            currentLinks.push(dep);
+                            dependencies.push(dep);
+                            
+                            const team1 = teams.find(t => t.id === story1.team);
+                            const team2 = teams.find(t => t.id === story2.team);
+                            activities.push(`Dependency identified: ${team1.name} → ${team2.name}`);
+                        }
+                    }
+                }
+                
+                // Feature-level dependencies
+                if (hour % 3 === 0 && Math.random() > 0.4) {
+                    const features = currentNodes.filter(n => n.type === 'feature');
+                    if (features.length > 2) {
+                        const f1 = features[Math.floor(Math.random() * features.length)];
+                        const f2 = features[Math.floor(Math.random() * features.length)];
+                        
+                        if (f1.team !== f2.team && f1.id !== f2.id) {
+                            const dep = {
+                                id: `fdep-${dependencies.length + 1}`,
+                                source: f1.id,
+                                target: f2.id,
+                                type: 'dependency'
+                            };
+                            
+                            if (!currentLinks.find(l => l.source === dep.source && l.target === dep.target)) {
+                                currentLinks.push(dep);
+                                dependencies.push(dep);
+                                activities.push(`Feature dependency: ${f1.name} → ${f2.name}`);
+                            }
+                        }
+                    }
+                }
+                
+                timeline.push({
+                    hour: timeSlot,
+                    day: 2,
+                    time: `${8 + Math.floor((hour - 16) / 2)}:${hour % 2 === 0 ? '00' : '30'} AM`,
+                    session: 'Dependencies',
+                    nodes: JSON.parse(JSON.stringify(currentNodes)),
+                    links: JSON.parse(JSON.stringify(currentLinks)),
+                    activities: activities,
+                    metrics: {
+                        features: currentNodes.filter(n => n.type === 'feature').length,
+                        stories: currentNodes.filter(n => n.type === 'story').length,
+                        points: totalPoints,
+                        dependencies: dependencies.length
+                    }
+                });
+            }
+            
+            // Day 2 Afternoon (24-31): Finalize and Commit
+            for (let hour = 24; hour <= 31; hour++) {
+                const timeSlot = hour;
+                const activities = [];
+                
+                // Final story adjustments
+                if (hour <= 27 && Math.random() > 0.6) {
+                    const teamIndex = (hour - 24) % 5;
+                    const team = teams[teamIndex];
+                    const teamStories = currentNodes.filter(n => n.type === 'story' && n.team === team.id);
+                    
+                    if (teamStories.length > 0) {
+                        activities.push(`${team.name} finalizing ${teamStories.length} stories`);
+                    }
+                }
+                
+                // Risk identification
+                if (hour >= 28 && hour <= 30) {
+                    activities.push("Risk assessment and mitigation planning");
+                }
+                
+                // Final commitment
+                if (hour === 31) {
+                    activities.push("Teams commit to PI objectives");
+                    activities.push("Confidence vote complete");
+                }
+                
+                timeline.push({
+                    hour: timeSlot,
+                    day: 2,
+                    time: `${1 + Math.floor((hour - 24) / 2)}:${hour % 2 === 0 ? '00' : '30'} PM`,
+                    session: 'Finalize & Commit',
+                    nodes: JSON.parse(JSON.stringify(currentNodes)),
+                    links: JSON.parse(JSON.stringify(currentLinks)),
+                    activities: activities,
+                    metrics: {
+                        features: currentNodes.filter(n => n.type === 'feature').length,
+                        stories: currentNodes.filter(n => n.type === 'story').length,
+                        points: totalPoints,
+                        dependencies: dependencies.length
+                    }
+                });
+            }
+            
+            return timeline;
+        }
+        
+        // Initialize
+        const timeline = generatePlanningTimeline();
+        let currentIndex = 0;
+        let isPlaying = false;
+        let playbackSpeed = 1.0;
+        let playInterval = null;
+        
+        // Set up D3 visualization
+        const width = window.innerWidth;
+        const height = window.innerHeight - 240;
+        
+        const svg = d3.select('#visualization')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        
+        // Add arrow marker for dependencies
+        svg.append('defs').append('marker')
+            .attr('id', 'arrowhead')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 20)
+            .attr('refY', 0)
+            .attr('markerWidth', 8)
+            .attr('markerHeight', 8)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', '#dc3545');
+        
+        const g = svg.append('g');
+        
+        // Add zoom and pan
+        const zoom = d3.zoom()
+            .scaleExtent([0.3, 3])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        // Initialize force simulation
+        const simulation = d3.forceSimulation()
+            .force('link', d3.forceLink().id(d => d.id).distance(60))
+            .force('charge', d3.forceManyBody().strength(d => {
+                if (d.id.startsWith('team-')) return -300;
+                if (d.type === 'feature') return -150;
+                return -80;
+            }))
+            .force('collision', d3.forceCollide().radius(d => {
+                if (d.id.startsWith('team-')) return 50;
+                if (d.type === 'feature') return 30;
+                return 20;
+            }))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('x', d3.forceX(width / 2).strength(0.05))
+            .force('y', d3.forceY(height / 2).strength(0.05));
+        
+        // Initialize visualization elements
+        let link = g.append('g').selectAll('.link');
+        let node = g.append('g').selectAll('.node');
+        
+        // Drag behavior
+        const drag = d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended);
+        
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            // Keep teams fixed, let other nodes float
+            if (!d.id.startsWith('team-')) {
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+        
+        // Update visualization
+        function updateVisualization(snapshot, animate = true) {
+            const duration = animate ? 500 / playbackSpeed : 0;
+            
+            // Update simulation nodes and links
+            simulation.nodes(snapshot.nodes);
+            simulation.force('link').links(snapshot.links);
+            
+            // Update links
+            link = link.data(snapshot.links, d => `${d.source.id || d.source}-${d.target.id || d.target}`);
+            
+            link.exit()
+                .transition()
+                .duration(duration)
+                .style('opacity', 0)
+                .remove();
+            
+            const linkEnter = link.enter()
+                .append('line')
+                .attr('class', d => `link link-${d.type}`)
+                .style('opacity', 0);
+            
+            link = linkEnter.merge(link);
+            
+            // Animate new dependencies
+            link.filter(d => d.type === 'dependency')
+                .classed('new', true);
+            
+            link.transition()
+                .duration(duration)
+                .style('opacity', 1);
+            
+            // Update nodes
+            node = node.data(snapshot.nodes, d => d.id);
+            
+            node.exit()
+                .each(d => {
+                    d.fx = null;
+                    d.fy = null;
+                })
+                .transition()
+                .duration(duration)
+                .style('opacity', 0)
+                .remove();
+            
+            const nodeEnter = node.enter()
+                .append('g')
+                .attr('class', 'node-group')
+                .call(drag)
+                .on('mouseover', function(event, d) {
+                    // Highlight connected links
+                    link.style('stroke-opacity', l => 
+                        (l.source.id === d.id || l.target.id === d.id) ? 1 : 0.2
+                    );
+                    // Show tooltip
+                    d3.select(this).select('circle')
+                        .transition()
+                        .duration(200)
+                        .attr('r', d => {
+                            if (d.id.startsWith('team-')) return 40;
+                            if (d.type === 'feature') return 25;
+                            return 15;
+                        });
+                })
+                .on('mouseout', function(event, d) {
+                    link.style('stroke-opacity', 0.4);
+                    d3.select(this).select('circle')
+                        .transition()
+                        .duration(200)
+                        .attr('r', d => {
+                            if (d.id.startsWith('team-')) return 35;
+                            if (d.type === 'feature') return 20;
+                            return 10;
+                        });
+                })
+                .on('dblclick', function(event, d) {
+                    // Double click to release fixed position
+                    d.fx = null;
+                    d.fy = null;
+                    simulation.alpha(0.3).restart();
+                });
+            
+            nodeEnter.append('circle')
+                .attr('class', d => {
+                    if (d.id.startsWith('team-')) return 'node team-node';
+                    if (d.type === 'feature') return 'node feature-node';
+                    return 'node story-node new';
+                })
+                .attr('r', d => {
+                    if (d.id.startsWith('team-')) return 35;
+                    if (d.type === 'feature') return 20;
+                    return 10;
+                })
+                .style('cursor', 'grab');
+            
+            nodeEnter.append('text')
+                .attr('class', d => {
+                    if (d.id.startsWith('team-')) return 'node-label team-label';
+                    if (d.type === 'feature') return 'node-label feature-label';
+                    return 'node-label story-label';
+                })
+                .attr('dy', d => d.id.startsWith('team-') ? 40 : 3)
+                .text(d => d.name);
+            
+            // Add title for hover tooltip
+            nodeEnter.append('title')
+                .text(d => {
+                    if (d.id.startsWith('team-')) return `${d.name}\nCapacity: ${d.capacity || 'N/A'}`;
+                    if (d.type === 'feature') return `${d.name}\nPoints: ${d.points}`;
+                    return `${d.name}\nPoints: ${d.points || 3}`;
+                });
+            
+            node = nodeEnter.merge(node);
+            
+            // Fix team positions but let physics affect other nodes
+            snapshot.nodes.forEach(d => {
+                if (d.id.startsWith('team-')) {
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+            });
+            
+            // Update simulation
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                
+                node.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+            
+            // Restart simulation with appropriate alpha
+            if (animate) {
+                simulation.alpha(0.3).restart();
+            } else {
+                simulation.alpha(0.1).restart();
+            }
+            
+            // Update UI
+            document.getElementById('day-indicator').textContent = `Day ${snapshot.day}`;
+            document.getElementById('time-display').textContent = snapshot.time;
+            document.getElementById('session-indicator').textContent = snapshot.session;
+            
+            // Update activities
+            const activityList = document.getElementById('activity-list');
+            activityList.innerHTML = snapshot.activities.map(a => 
+                `<div class="activity-item">${a}</div>`
+            ).join('') || '<div class="activity-item">Planning in progress...</div>';
+            
+            // Update metrics
+            document.getElementById('feature-count').textContent = snapshot.metrics.features;
+            document.getElementById('story-count').textContent = snapshot.metrics.stories;
+            document.getElementById('points-total').textContent = snapshot.metrics.points;
+            document.getElementById('dependency-count').textContent = snapshot.metrics.dependencies;
+        }
+        
+        // Playback controls
+        function play() {
+            if (currentIndex >= timeline.length - 1) {
+                currentIndex = 0;
+            }
+            
+            isPlaying = true;
+            document.getElementById('btn-play').innerHTML = '⏸️ Pause';
+            
+            playInterval = setInterval(() => {
+                if (currentIndex < timeline.length - 1) {
+                    currentIndex++;
+                    document.getElementById('timeline-slider').value = currentIndex;
+                    updateVisualization(timeline[currentIndex]);
+                } else {
+                    pause();
+                }
+            }, 1000 / playbackSpeed);
+        }
+        
+        function pause() {
+            isPlaying = false;
+            document.getElementById('btn-play').innerHTML = '▶️ Play';
+            if (playInterval) {
+                clearInterval(playInterval);
+                playInterval = null;
+            }
+        }
+        
+        function goToIndex(index) {
+            currentIndex = Math.max(0, Math.min(index, timeline.length - 1));
+            document.getElementById('timeline-slider').value = currentIndex;
+            updateVisualization(timeline[currentIndex]);
+        }
+        
+        // Event listeners
+        document.getElementById('btn-play').addEventListener('click', () => {
+            if (isPlaying) {
+                pause();
+            } else {
+                play();
+            }
+        });
+        
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            pause();
+            goToIndex(currentIndex - 1);
+        });
+        
+        document.getElementById('btn-next').addEventListener('click', () => {
+            pause();
+            goToIndex(currentIndex + 1);
+        });
+        
+        document.getElementById('btn-start').addEventListener('click', () => {
+            pause();
+            goToIndex(0);
+        });
+        
+        document.getElementById('btn-end').addEventListener('click', () => {
+            pause();
+            goToIndex(timeline.length - 1);
+        });
+        
+        document.getElementById('timeline-slider').addEventListener('input', (e) => {
+            pause();
+            goToIndex(parseInt(e.target.value));
+        });
+        
+        // Speed controls
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                playbackSpeed = parseFloat(btn.dataset.speed);
+                if (isPlaying) {
+                    pause();
+                    play();
+                }
+            });
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    if (isPlaying) pause();
+                    else play();
+                    break;
+                case 'ArrowLeft':
+                    pause();
+                    goToIndex(currentIndex - 1);
+                    break;
+                case 'ArrowRight':
+                    pause();
+                    goToIndex(currentIndex + 1);
+                    break;
+            }
+        });
+        
+        // Initialize
+        updateVisualization(timeline[0], false);
+    </script>
+</body>
+</html>

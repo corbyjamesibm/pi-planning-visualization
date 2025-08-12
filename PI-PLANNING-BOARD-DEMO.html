@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Planning Board - Interactive Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .spacing-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 15px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            border: 2px solid #667eea;
+        }
+        
+        .spacing-slider {
+            width: 150px;
+            cursor: pointer;
+        }
+        
+        .spacing-value {
+            min-width: 60px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .preset-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: white;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .preset-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        #visualization {
+            width: 100%;
+            height: calc(100vh - 70px);
+            background: white;
+        }
+        
+        .node {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .node:hover {
+            filter: brightness(1.1);
+        }
+        
+        .node-group {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+        
+        .team-node {
+            fill: #f0f4f8;
+            stroke: #667eea;
+            stroke-width: 2;
+        }
+        
+        .epic-node {
+            fill: #ffd93d;
+            stroke: #f39c12;
+            stroke-width: 2;
+        }
+        
+        .feature-node {
+            fill: #6bcf7f;
+            stroke: #27ae60;
+            stroke-width: 2;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 2;
+        }
+        
+        .link-dependency {
+            stroke: #e74c3c;
+            stroke-dasharray: 5, 5;
+        }
+        
+        .link-assignment {
+            stroke: #3498db;
+        }
+        
+        .node-label {
+            font-size: 12px;
+            font-weight: 600;
+            fill: #333;
+            pointer-events: none;
+            text-anchor: middle;
+        }
+        
+        .capacity-label {
+            font-size: 10px;
+            fill: #666;
+            text-anchor: middle;
+        }
+        
+        .tooltip {
+            position: absolute;
+            text-align: left;
+            padding: 10px;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .stats {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 14px;
+        }
+        
+        .stat-item {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        
+        .legend {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 PI Planning Board - Q1 2025</h1>
+        <div class="controls">
+            <div class="spacing-control">
+                <label>Cluster Spacing:</label>
+                <input type="range" 
+                       id="spacing-slider" 
+                       class="spacing-slider"
+                       min="50" 
+                       max="500" 
+                       value="200" 
+                       step="10">
+                <span class="spacing-value" id="spacing-value">200px</span>
+                <button class="preset-btn" onclick="setSpacing(100)">Compact</button>
+                <button class="preset-btn" onclick="setSpacing(200)">Normal</button>
+                <button class="preset-btn" onclick="setSpacing(350)">Wide</button>
+            </div>
+            <div class="control-group">
+                <label>View:</label>
+                <button class="btn active" data-view="network">Network</button>
+                <button class="btn" data-view="hierarchy">Hierarchy</button>
+                <button class="btn" data-view="timeline">Timeline</button>
+            </div>
+            <button class="btn" onclick="resetView()">Reset View</button>
+        </div>
+    </div>
+    
+    <div id="visualization"></div>
+    
+    <div class="stats">
+        <h3>Sprint 3 Stats</h3>
+        <div class="stat-item">
+            <span>Teams:</span>
+            <strong id="team-count">0</strong>
+        </div>
+        <div class="stat-item">
+            <span>Epics:</span>
+            <strong id="epic-count">0</strong>
+        </div>
+        <div class="stat-item">
+            <span>Features:</span>
+            <strong id="feature-count">0</strong>
+        </div>
+        <div class="stat-item">
+            <span>Dependencies:</span>
+            <strong id="dep-count">0</strong>
+        </div>
+        <div class="stat-item">
+            <span>Capacity:</span>
+            <strong id="capacity">0%</strong>
+        </div>
+    </div>
+    
+    <div class="legend">
+        <h3>Legend</h3>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f0f4f8;"></div>
+            <span>Team</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ffd93d;"></div>
+            <span>Epic</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #6bcf7f;"></div>
+            <span>Feature</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: none; border-color: #e74c3c; border-style: dashed;"></div>
+            <span>Dependency</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: none; border-color: #3498db;"></div>
+            <span>Assignment</span>
+        </div>
+    </div>
+    
+    <div class="tooltip"></div>
+    
+    <script>
+        // Generate realistic PI Planning data
+        const data = {
+            nodes: [
+                // Teams
+                { id: 'team-1', name: 'Platform Services', type: 'team', capacity: 120, used: 85 },
+                { id: 'team-2', name: 'Digital Delivery', type: 'team', capacity: 100, used: 92 },
+                { id: 'team-3', name: 'Data Analytics', type: 'team', capacity: 80, used: 65 },
+                { id: 'team-4', name: 'Customer Experience', type: 'team', capacity: 90, used: 78 },
+                { id: 'team-5', name: 'Infrastructure', type: 'team', capacity: 110, used: 95 },
+                
+                // Epics
+                { id: 'epic-1', name: 'API Gateway 2.0', type: 'epic', points: 40, priority: 'high', owner: 'team-1' },
+                { id: 'epic-2', name: 'Customer Portal', type: 'epic', points: 35, priority: 'high', owner: 'team-2' },
+                { id: 'epic-3', name: 'Analytics Dashboard', type: 'epic', points: 30, priority: 'medium', owner: 'team-3' },
+                { id: 'epic-4', name: 'Mobile App', type: 'epic', points: 45, priority: 'high', owner: 'team-4' },
+                { id: 'epic-5', name: 'Cloud Migration', type: 'epic', points: 50, priority: 'critical', owner: 'team-5' },
+                { id: 'epic-6', name: 'Security Enhancement', type: 'epic', points: 25, priority: 'high', owner: 'team-1' },
+                
+                // Features
+                { id: 'feat-1', name: 'Authentication Service', type: 'feature', points: 13, epic: 'epic-1', sprint: 1 },
+                { id: 'feat-2', name: 'Rate Limiting', type: 'feature', points: 8, epic: 'epic-1', sprint: 1 },
+                { id: 'feat-3', name: 'User Dashboard', type: 'feature', points: 15, epic: 'epic-2', sprint: 1 },
+                { id: 'feat-4', name: 'Payment Integration', type: 'feature', points: 20, epic: 'epic-2', sprint: 2 },
+                { id: 'feat-5', name: 'Real-time Charts', type: 'feature', points: 18, epic: 'epic-3', sprint: 2 },
+                { id: 'feat-6', name: 'Export Reports', type: 'feature', points: 12, epic: 'epic-3', sprint: 3 },
+                { id: 'feat-7', name: 'iOS App', type: 'feature', points: 25, epic: 'epic-4', sprint: 1 },
+                { id: 'feat-8', name: 'Android App', type: 'feature', points: 20, epic: 'epic-4', sprint: 2 },
+                { id: 'feat-9', name: 'Database Migration', type: 'feature', points: 30, epic: 'epic-5', sprint: 1 },
+                { id: 'feat-10', name: 'Kubernetes Setup', type: 'feature', points: 20, epic: 'epic-5', sprint: 2 },
+                { id: 'feat-11', name: 'OAuth 2.0', type: 'feature', points: 15, epic: 'epic-6', sprint: 3 },
+                { id: 'feat-12', name: 'Encryption Layer', type: 'feature', points: 10, epic: 'epic-6', sprint: 3 }
+            ],
+            links: [
+                // Team to Epic assignments
+                { source: 'team-1', target: 'epic-1', type: 'assignment' },
+                { source: 'team-2', target: 'epic-2', type: 'assignment' },
+                { source: 'team-3', target: 'epic-3', type: 'assignment' },
+                { source: 'team-4', target: 'epic-4', type: 'assignment' },
+                { source: 'team-5', target: 'epic-5', type: 'assignment' },
+                { source: 'team-1', target: 'epic-6', type: 'assignment' },
+                
+                // Epic to Feature hierarchy
+                { source: 'epic-1', target: 'feat-1', type: 'assignment' },
+                { source: 'epic-1', target: 'feat-2', type: 'assignment' },
+                { source: 'epic-2', target: 'feat-3', type: 'assignment' },
+                { source: 'epic-2', target: 'feat-4', type: 'assignment' },
+                { source: 'epic-3', target: 'feat-5', type: 'assignment' },
+                { source: 'epic-3', target: 'feat-6', type: 'assignment' },
+                { source: 'epic-4', target: 'feat-7', type: 'assignment' },
+                { source: 'epic-4', target: 'feat-8', type: 'assignment' },
+                { source: 'epic-5', target: 'feat-9', type: 'assignment' },
+                { source: 'epic-5', target: 'feat-10', type: 'assignment' },
+                { source: 'epic-6', target: 'feat-11', type: 'assignment' },
+                { source: 'epic-6', target: 'feat-12', type: 'assignment' },
+                
+                // Dependencies between features
+                { source: 'feat-1', target: 'feat-3', type: 'dependency' },
+                { source: 'feat-1', target: 'feat-11', type: 'dependency' },
+                { source: 'feat-9', target: 'feat-10', type: 'dependency' },
+                { source: 'feat-5', target: 'feat-6', type: 'dependency' },
+                { source: 'feat-7', target: 'feat-8', type: 'dependency' },
+                { source: 'feat-2', target: 'feat-4', type: 'dependency' }
+            ]
+        };
+        
+        // Set up dimensions
+        const width = window.innerWidth;
+        const height = window.innerHeight - 70;
+        
+        // Create SVG
+        const svg = d3.select('#visualization')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        
+        // Add zoom behavior
+        const g = svg.append('g');
+        
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 4])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+        
+        svg.call(zoom);
+        
+        // Create force simulation with adjustable spacing
+        let currentSpacing = 200;
+        const simulation = d3.forceSimulation(data.nodes)
+            .force('link', d3.forceLink(data.links).id(d => d.id).distance(100))
+            .force('charge', d3.forceManyBody().strength(-300))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide().radius(d => {
+                if (d.type === 'team') return 60;
+                if (d.type === 'epic') return 40;
+                return 30;
+            }));
+        
+        // Function to update spacing
+        function updateSpacing(spacing) {
+            currentSpacing = spacing;
+            
+            // Update force strengths based on spacing
+            simulation
+                .force('charge', d3.forceManyBody().strength(-spacing * 1.5))
+                .force('link', d3.forceLink(data.links).id(d => d.id).distance(spacing * 0.5))
+                .force('collision', d3.forceCollide().radius(d => {
+                    const baseRadius = d.type === 'team' ? 60 : d.type === 'epic' ? 40 : 30;
+                    return baseRadius + (spacing / 10);
+                }))
+                .alpha(0.3)
+                .restart();
+            
+            // Update display value
+            document.getElementById('spacing-value').textContent = spacing + 'px';
+        }
+        
+        // Set initial spacing
+        updateSpacing(currentSpacing);
+        
+        // Create links
+        const link = g.append('g')
+            .selectAll('line')
+            .data(data.links)
+            .enter().append('line')
+            .attr('class', d => `link link-${d.type}`)
+            .attr('stroke-width', d => d.type === 'dependency' ? 2 : 3);
+        
+        // Create node groups
+        const node = g.append('g')
+            .selectAll('.node-group')
+            .data(data.nodes)
+            .enter().append('g')
+            .attr('class', 'node-group')
+            .call(drag(simulation));
+        
+        // Add circles for nodes
+        node.append('circle')
+            .attr('class', d => `node ${d.type}-node`)
+            .attr('r', d => {
+                if (d.type === 'team') return 50;
+                if (d.type === 'epic') return 35;
+                return 25;
+            });
+        
+        // Add labels
+        node.append('text')
+            .attr('class', 'node-label')
+            .attr('dy', d => d.type === 'team' ? -5 : 0)
+            .text(d => d.name);
+        
+        // Add capacity labels for teams
+        node.filter(d => d.type === 'team')
+            .append('text')
+            .attr('class', 'capacity-label')
+            .attr('dy', 10)
+            .text(d => `${d.used}/${d.capacity} pts`);
+        
+        // Add points labels for epics and features
+        node.filter(d => d.type !== 'team')
+            .append('text')
+            .attr('class', 'capacity-label')
+            .attr('dy', 15)
+            .text(d => d.points ? `${d.points} pts` : '');
+        
+        // Tooltip
+        const tooltip = d3.select('.tooltip');
+        
+        node.on('mouseover', (event, d) => {
+            let content = `<strong>${d.name}</strong><br>`;
+            if (d.type === 'team') {
+                content += `Capacity: ${d.used}/${d.capacity} pts<br>`;
+                content += `Utilization: ${Math.round(d.used/d.capacity*100)}%`;
+            } else if (d.type === 'epic') {
+                content += `Points: ${d.points}<br>`;
+                content += `Priority: ${d.priority}<br>`;
+                content += `Owner: ${d.owner}`;
+            } else {
+                content += `Points: ${d.points}<br>`;
+                content += `Sprint: ${d.sprint}<br>`;
+                content += `Epic: ${d.epic}`;
+            }
+            
+            tooltip.html(content)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 10) + 'px')
+                .style('opacity', 1);
+        })
+        .on('mouseout', () => {
+            tooltip.style('opacity', 0);
+        });
+        
+        // Update positions on tick
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+        
+        // Drag functions
+        function drag(simulation) {
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+            
+            return d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended);
+        }
+        
+        // Update stats
+        document.getElementById('team-count').textContent = data.nodes.filter(n => n.type === 'team').length;
+        document.getElementById('epic-count').textContent = data.nodes.filter(n => n.type === 'epic').length;
+        document.getElementById('feature-count').textContent = data.nodes.filter(n => n.type === 'feature').length;
+        document.getElementById('dep-count').textContent = data.links.filter(l => l.type === 'dependency').length;
+        
+        const totalCapacity = data.nodes.filter(n => n.type === 'team').reduce((sum, t) => sum + t.capacity, 0);
+        const totalUsed = data.nodes.filter(n => n.type === 'team').reduce((sum, t) => sum + t.used, 0);
+        document.getElementById('capacity').textContent = Math.round(totalUsed/totalCapacity*100) + '%';
+        
+        // View controls
+        document.querySelectorAll('[data-view]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                // View switching logic would go here
+            });
+        });
+        
+        // Filter controls
+        document.querySelectorAll('[data-filter]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const filter = btn.dataset.filter;
+                if (filter === 'dependencies') {
+                    link.style('opacity', d => d.type === 'dependency' ? 1 : 0.1);
+                } else if (filter === 'blockers') {
+                    node.style('opacity', d => d.priority === 'critical' || d.priority === 'high' ? 1 : 0.3);
+                } else {
+                    link.style('opacity', 1);
+                    node.style('opacity', 1);
+                }
+            });
+        });
+        
+        // Reset view
+        function resetView() {
+            svg.transition().duration(750).call(
+                zoom.transform,
+                d3.zoomIdentity
+            );
+            link.style('opacity', 1);
+            node.style('opacity', 1);
+            setSpacing(200);
+        }
+        
+        // Slider event listener
+        document.getElementById('spacing-slider').addEventListener('input', function(e) {
+            updateSpacing(parseInt(e.target.value));
+        });
+        
+        // Preset button function
+        function setSpacing(value) {
+            document.getElementById('spacing-slider').value = value;
+            updateSpacing(value);
+        }
+        
+        // Keyboard shortcuts for spacing
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT') return;
+            
+            const slider = document.getElementById('spacing-slider');
+            const current = parseInt(slider.value);
+            
+            if (e.key === '+' || e.key === '=') {
+                const newValue = Math.min(current + 10, 500);
+                setSpacing(newValue);
+            } else if (e.key === '-' || e.key === '_') {
+                const newValue = Math.max(current - 10, 50);
+                setSpacing(newValue);
+            } else if (e.key === '0') {
+                setSpacing(200);
+            }
+        });
+    </script>
+</body>
+</html>
