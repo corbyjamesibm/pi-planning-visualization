@@ -2,6 +2,16 @@
 
 A collection of interactive D3.js visualizations for SAFe PI (Program Increment) Planning events, developed as part of Sprint 3-4.
 
+## 🌐 Live Demo
+
+View the live visualizations at: https://corbyjamesibm.github.io/pi-planning-visualization/
+
+Or access individual visualizations:
+- [Main Dashboard](https://corbyjamesibm.github.io/pi-planning-visualization/visualization-index.html)
+- [2-Day PI Planning Event](https://corbyjamesibm.github.io/pi-planning-visualization/PI-PLANNING-EVENT-TIMELAPSE.html)
+- [Cluster View](https://corbyjamesibm.github.io/pi-planning-visualization/PI-PLANNING-CLUSTER-VIEW.html)
+- [90-Day Time-Lapse](https://corbyjamesibm.github.io/pi-planning-visualization/PI-PLANNING-TIME-LAPSE.html)
+
 ## 🎯 Main Visualizations
 
 ### 1. PI Planning Event Time-lapse (`PI-PLANNING-EVENT-TIMELAPSE.html`)
